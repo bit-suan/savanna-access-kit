@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Member 2 — Media Access Sandbox</title>
+  <!-- Inline favicon: prevents browser from making a separate /favicon.ico 404 request -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎬</text></svg>">
+
+  <!--
+    Import map: maps every bare specifier that Lit's own modules use.
+    "lit" itself re-exports from lit-element/lit-html which in turn use
+    @lit/reactive-element. All four must be in the map, pointing to the
+    esm.sh self-contained bundles that carry NO further bare imports.
+  -->
+  <script type="importmap">
+  {
+    "imports": {
+      "lit":                       "https://esm.sh/lit@3.2.1/es2022/lit.bundle.mjs",
+      "lit/decorators.js":         "https://esm.sh/lit@3.2.1/es2022/decorators.bundle.mjs",
+      "@lit/reactive-element":     "https://esm.sh/@lit/reactive-element@2.0.4/es2022/reactive-element.bundle.mjs",
+      "lit-html":                  "https://esm.sh/lit-html@3.2.1/es2022/lit-html.bundle.mjs",
+      "lit-element":               "https://esm.sh/lit-element@4.1.0/es2022/lit-element.bundle.mjs",
+      "lit-element/lit-element.js":"https://esm.sh/lit-element@4.1.0/es2022/lit-element.bundle.mjs"
+    }
+  }
+  </script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 20px;
+      background: linear-gradient(135deg,#f6f3f8,#f0e6f6);
+      color: #21182a; font: 16px/1.5 'Segoe UI',system-ui,sans-serif;
+    }
+    main { max-width: 1200px; margin: 0 auto; }
+    h1   { color:#5b3477; margin:0 0 4px; font-size:26px; }
+    .sub { color:#888; font-size:13px; margin:0 0 20px; }
+
+    .grid  { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px; }
+    .full  { grid-column:1/-1; }
+    @media(max-width:900px){ .grid{ grid-template-columns:1fr; } }
+
+    .card  { background:#fff; border:1px solid #e0d5e8; border-radius:12px; padding:20px; box-shadow:0 2px 8px rgba(0,0,0,.04); }
+    .card h2 { margin:0 0 14px; color:#5b3477; font-size:17px; }
+
+    /* ── video ── */
+    .player-wrap { position:relative; padding-bottom:56.25%; background:#000; border-radius:8px; overflow:hidden; margin-bottom:12px; }
+    .player-wrap video { position:absolute; inset:0; width:100%; height:100%; }
+
+    /* ── controls ── */
+    .row   { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0; align-items:center; }
+    button,select { min-height:44px; padding:8px 14px; border:1px solid #d0c0dc; border-radius:8px; font:14px system-ui; cursor:pointer; }
+    button { background:#5b3477; color:#fff; }
+    button:hover { background:#4a2a62; }
+    button:focus-visible { outline:3px solid #e09b00; outline-offset:2px; }
+    button:disabled { opacity:.5; cursor:not-allowed; }
+    select { background:#fff; color:#241b2b; }
+    label  { display:block; margin:10px 0 4px; font-weight:600; font-size:13px; color:#5b3477; }
+
+    .mono  { background:#f0e6f6; border:1px solid #d0c0dc; border-radius:8px; padding:10px 12px; font:13px monospace; color:#5b3477; word-break:break-all; margin:8px 0; }
+    .info  { background:#e3f2fd; border-left:4px solid #2196f3; border-radius:4px; padding:10px 12px; font-size:13px; color:#0d47a1; margin:10px 0; }
+    .warn  { background:#fff8e1; border-left:4px solid #f9a825; border-radius:4px; padding:10px 12px; font-size:13px; color:#5d4037; margin:10px 0; }
+
+    .log   { font:12px monospace; background:#111; color:#0f0; border-radius:8px; padding:10px; height:120px; overflow-y:auto; margin:8px 0; }
+    .log .ev { color:#ff0; display:block; }
+
+    /* ── sign host: relative container so position:absolute works inside ── */
+    .player-wrap #sign-host { position:absolute; inset:0; pointer-events:none; }
+    .player-wrap #sign-host > savanna-sign-window { pointer-events:auto; }
+
+    progress { width:100%; height:18px; display:block; margin:6px 0; }
+
+    /* ── online/offline badge ── */
+    #netBadge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
+    #netBadge.online  { background:#e8f5e9; color:#2e7d32; }
+    #netBadge.offline { background:#ffebee; color:#c62828; }
+
+    /* ── sign cue + AD cue display ── */
+    .cue-box { background:#1a1a2e; color:#e0e0ff; border-radius:8px; padding:10px 14px; font-size:14px; min-height:40px; margin:8px 0; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>🎬 Savanna Media Access — Member 2 Sandbox</h1>
+  <p class="sub">
+    Fake C2 player · real Lit components · real media files · no build step ·
+    <span id="netBadge" class="online">● Online</span>
+  </p>
+
+  <!-- ═══════════════ BROWSER ERROR NOTES ═══════════════ -->
+  <div class="warn">
+    <strong>Browser error notes (see MEMBER_2_COMPLETION_REPORT.md §Errors):</strong><br>
+    <strong>CSP error</strong> — Chrome DevTools itself sends a probe to
+    <code>localhost:4010/.well-known/appspecific/com.chrome.devtools.json</code>.
+    This is a browser-generated diagnostic request, not an application request.
+    The application does not generate it and cannot suppress it without
+    disabling the DevTools connection. No application-side fix is appropriate.<br>
+    <strong>404 error</strong> — <code>L-102/pack.json</code> fixture was missing; now created.<br>
+    <strong>Lit bare-import error</strong> — fixed by using <code>esm.sh</code> self-contained bundles
+    that carry no further bare specifiers, eliminating the need to map every transitive sub-package.
+  </div>
+
+  <!-- ═══════════════ VIDEO PLAYER ═══════════════ -->
+  <div class="grid">
+    <div class="card full">
+      <h2>▶️ Main Lesson Video (Fake C2 Player)</h2>
+      <div class="info">
+        Real file: <code>contracts/fixtures/media/lesson.mp4</code> (161 KB) ·
+        Emits <code>savanna:timeupdate / play / pause / seeked</code> to
+        <code>window</code> so all three components receive them.
+      </div>
+
+      <div class="player-wrap">
+        <video id="vid" controls playsinline preload="metadata">
+          <source src="../../contracts/fixtures/media/lesson.mp4" type="video/mp4">
+        </video>
+        <div id="sign-host" aria-label="Sign language overlay"></div>
+      </div>
+
+      <div class="row">
+        <button id="btnPlay">▶ Play</button>
+        <button id="btnPause">⏸ Pause</button>
+        <button id="btnReset">⏮ Reset</button>
+        <label style="margin:0">Speed
+          <select id="selSpeed">
+            <option value="0.5">0.5×</option>
+            <option value="1" selected>1×</option>
+            <option value="1.5">1.5×</option>
+            <option value="2">2×</option>
+          </select>
+        </label>
+      </div>
+
+      <label>Playback time</label>
+      <div class="mono" id="timeDisp">0:00 / 0:00</div>
+
+      <label>Current sign cue</label>
+      <div class="cue-box" id="signCueDisp" aria-live="polite">—</div>
+
+      <label>Current AD cue</label>
+      <div class="cue-box" id="adCueDisp" aria-live="polite">—</div>
+
+      <label>Event log (last 6)</label>
+      <div class="log" id="evLog"><span>Waiting for events…</span></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ SIGN WINDOW ═══════════════ -->
+  <!-- ═══════════════ AUDIO DESC + OFFLINE ═══════════════ -->
+  <div class="grid">
+    <div class="card">
+      <h2>🔊 Audio Description — <code>&lt;savanna-audio-description&gt;</code></h2>
+      <div class="info">
+        Recorded: <code>ad.opus</code> · Text: <code>ad.vtt</code> ·
+        Press <kbd>D</kbd> anywhere (not in a text field) to toggle.
+      </div>
+      <div id="ad-host"></div>
+    </div>
+
+    <div class="card">
+      <h2>💾 Offline Save — <code>&lt;savanna-offline&gt;</code></h2>
+      <div class="info">
+        API at <code>localhost:4010</code>.
+        Run <code>npm run mock</code> to start. The pack manifest at
+        <code>/v1/lessons/L-102/pack</code> now returns real fixture data.
+      </div>
+      <div id="ol-host"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ TEST CHECKLIST ═══════════════ -->
+  <div class="card">
+    <h2>✅ Interactive Test Checklist</h2>
+    <div style="columns:3;gap:24px;font-size:13px">
+      <div>
+        <strong>Sign window</strong>
+        <ul style="padding-left:18px;margin:6px 0">
+          <li>Panel appears immediately</li>
+          <li>Drag with mouse / touch</li>
+          <li>Tab focus + arrow keys</li>
+          <li>Shift+arrows (100 px step)</li>
+          <li>Alt+arrows (resize)</li>
+          <li>↗ ↘ snap corners</li>
+          <li>Position persists on reload</li>
+          <li>Fallback "No sign video yet"</li>
+          <li>Loading → Ready states</li>
+        </ul>
+      </div>
+      <div>
+        <strong>Audio description</strong>
+        <ul style="padding-left:18px;margin:6px 0">
+          <li>D key toggles</li>
+          <li>Play / Stop buttons</li>
+          <li>Text mode shows timed cues</li>
+          <li>Audio mode plays ad.opus</li>
+          <li>Extended pauses video</li>
+          <li>Status live-region</li>
+          <li>AD cue shown in debug panel</li>
+        </ul>
+      </div>
+      <div>
+        <strong>Offline</strong>
+        <ul style="padding-left:18px;margin:6px 0">
+          <li>Shows pack size (1.72 MB)</li>
+          <li>Progress bar fills</li>
+          <li>Save → Delete cycle</li>
+          <li>Error when API absent</li>
+          <li>Online/Offline badge</li>
+        </ul>
+        <strong>Events / debug</strong>
+        <ul style="padding-left:18px;margin:6px 0">
+          <li>timeupdate fires on play</li>
+          <li>play / pause / seeked shown</li>
+          <li>Sign cue updates</li>
+          <li>AD cue updates</li>
+          <li>No console errors</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- ════════════════════════════════════════════════════════════════
+     COMPONENTS + FAKE PLAYER  —  plain JS, Lit from esm.sh bundle
+     (no bare module specifiers, no local .ts imports)
+════════════════════════════════════════════════════════════════ -->
+<script type="module">
+
+/* ── The esm.sh bundle URL is a self-contained file; importing it here
+   satisfies every sub-import that Lit uses internally. ── */
+import { LitElement, css, html } from 'lit';
+
+/* ──────────────────────────────────────────────
+   SHARED prefs helpers  (C3: savanna.prefs.v1)
+────────────────────────────────────────────── */
+const PKEY = 'savanna.prefs.v1';
+function readPrefs()       { try { return JSON.parse(localStorage.getItem(PKEY)||'{}'); } catch { return {}; } }
+function writePrefs(p)     { try { localStorage.setItem(PKEY, JSON.stringify(p)); } catch {} }
+function readNs(ns)        { return readPrefs()[ns] || {}; }
+function writeNs(ns, data) { const p = readPrefs(); p[ns] = data; writePrefs(p); }
+
+/* ══════════════════════════════════════════════
+   1.  <savanna-sign-window>
+   Tasks 2.1 / 2.2 / 2.3
+══════════════════════════════════════════════ */
+class SavannaSignWindow extends LitElement {
+
+  static properties = {
+    src:      { type: String },
+    offsetMs: { type: Number, attribute: 'offset-ms' },
+    lang:     { type: String },
+     enabled:  { type: Boolean, reflect: true },
+    /* reactive private state */
+    _loadState: { state: true },  // 'idle'|'loading'|'ready'|'error'|'no-src'
+    _p:         { state: true },  // { x, y, w, h }
+  };
+
+  static styles = css`
+    :host {
+      position: absolute;
+      display: block;
+      z-index: 20;
+      width: var(--sw, 320px);
+      color: #fff;
+      font: 15px/1.4 system-ui;
+      touch-action: none;
+    }
+     :host(:not([enabled])) { width: auto; }
+     :host(:not([enabled])) .body,
+     :host(:not([enabled])) .resize-btn,
+     :host(:not([enabled])) .snaps { display: none; }
+    section {
+      background: #17131c;
+      border: 2px solid rgba(255,255,255,.85);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 24px rgba(0,0,0,.55);
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 7px 10px;
+      background: #30243a;
+      cursor: move;
+      user-select: none;
+    }
+    header:focus-visible { outline: 3px solid #ffbf47; outline-offset: 2px; }
+    .snaps button {
+      min-width: 36px; min-height: 36px;
+      border: 1px solid #bda8d0; border-radius: 6px;
+      background: #49375a; color: #fff; font: inherit; cursor: pointer;
+    }
+    .snaps button:focus-visible { outline: 3px solid #ffbf47; outline-offset: 2px; }
+     .toggle { min-width:64px; min-height:36px; border:1px solid #bda8d0; border-radius:6px; background:#49375a; color:#fff; font:inherit; font-weight:700; cursor:pointer; }
+     .toggle[aria-pressed="true"] { background:#6e4a8e; }
+     .toggle:focus-visible { outline:3px solid #ffbf47; outline-offset:2px; }
+    .body {
+      position: relative;
+      background: #08070a;
+      height: var(--sh, 150px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    video {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: contain;
+      background: #08070a;
+    }
+    .overlay {
+      position: absolute; inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 12px;
+      pointer-events: none;
+      background: rgba(8,7,10,.82);
+    }
+    .overlay.hidden { display: none; }
+    .spinner {
+      width: 28px; height: 28px;
+      border: 3px solid rgba(255,255,255,.2);
+      border-top-color: #bda8d0;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+      margin-bottom: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .resize-btn {
+      position: absolute; right: 4px; bottom: 4px;
+      min-width: 28px; min-height: 28px;
+      border: 1px solid #bda8d0; border-radius: 5px;
+      background: #49375a; color: #fff; font: inherit; cursor: nwse-resize;
+    }
+    .resize-btn:focus-visible { outline: 3px solid #ffbf47; outline-offset: 2px; }
+    #announcer { position: absolute; left: -9999px; }
+  `;
+
+  constructor() {
+    super();
+    this.src      = '';
+    this.offsetMs = 0;
+    this.lang     = '';
+     this.enabled  = true;
+    const s       = readNs('sign');
+    this._p       = { x: s.x ?? 8, y: s.y ?? 8, w: s.w ?? 320, h: s.h ?? 180 };
+    this._loadState = 'idle';
+    this._drag    = null;
+    this._rsz     = null;
+    this._vid     = null;
+    this._retries = 0;
+  }
+
+  /* ── lifecycle ── */
+  connectedCallback() {
+    super.connectedCallback();
+    this._applyPos();
+    window.addEventListener('resize',               this._clamp);
+    window.addEventListener('savanna:lang-change',  this._onLang);
+    window.addEventListener('savanna:timeupdate',   this._onTime);
+    // Start load if src already set
+    if (this.src) this._loadState = 'loading';
+    else          this._loadState = 'no-src';
+  }
+
+  disconnectedCallback() {
+    window.removeEventListener('resize',              this._clamp);
+    window.removeEventListener('savanna:lang-change', this._onLang);
+    window.removeEventListener('savanna:timeupdate',  this._onTime);
+    super.disconnectedCallback();
+  }
+
+  updated(changed) {
+    this._vid = this.renderRoot.querySelector('video') || null;
+
+    if (changed.has('src')) {
+      if (this.src) {
+        this._loadState = 'loading';
+        this._retries   = 0;
+        if (this._vid) {
+          this._vid.src = this.src;
+          this._vid.load();
+        }
+      } else {
+        this._loadState = 'no-src';
+      }
+    }
+  }
+
+  /* ── position helpers ── */
+  _savePos() { writeNs('sign', { ...this._p }); }
+  _applyPos() {
+    const { x, y, w, h } = this._p;
+    this.style.left = x + 'px';
+    this.style.top  = y + 'px';
+    this.style.setProperty('--sw', w + 'px');
+    this.style.setProperty('--sh', Math.max(80, h - 46) + 'px');
+  }
+  _clamp = () => {
+    const { w, h } = this._p;
+    this._p = {
+      ...this._p,
+      x: Math.max(0, Math.min(this._p.x, innerWidth  - w - 4)),
+      y: Math.max(0, Math.min(this._p.y, innerHeight - h - 4)),
+    };
+    this._savePos();
+    this._applyPos();
+  };
+
+  /* ── event handlers ── */
+  _onLang = (e) => { if (e.detail?.lang) this.lang = e.detail.lang; };
+
+  _onTime = (e) => {
+    const d = e.detail;
+    if (!this.enabled || !this._vid || !d || this._loadState !== 'ready') return;
+    const t = Math.max(0, d.time - this.offsetMs / 1000);
+    // Drift correction: >300 ms
+    if (Math.abs(this._vid.currentTime - t) > 0.3) {
+      try { this._vid.currentTime = t; } catch {}
+    }
+    this._vid.playbackRate = d.rate || 1;
+    if (d.paused) {
+      this._vid.pause();
+    } else if (this._vid.paused) {
+      this._vid.play().catch(() => {});
+    }
+  };
+
+  /* ── move / resize ── */
+  _move(dx, dy) {
+    this._p = { ...this._p, x: this._p.x + dx, y: this._p.y + dy };
+    this._clamp();
+    const ann = this.renderRoot.getElementById('announcer');
+    if (ann) ann.textContent = `Sign window at ${Math.round(this._p.x)}, ${Math.round(this._p.y)}`;
+    this.dispatchEvent(new CustomEvent('savanna:sign-position', {
+      bubbles: true, composed: true, detail: { ...this._p }
+    }));
+  }
+  _resize(dw, dh) {
+    this._p = {
+      ...this._p,
+      w: Math.max(180, Math.min(640, this._p.w + dw)),
+      h: Math.max(120, Math.min(500, this._p.h + dh)),
+    };
+    this._savePos(); this._applyPos();
+  }
+
+  /* ── pointer drag ── */
+  _startDrag(e) {
+    if (e.target.closest('button')) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    this._drag = { px: this._p.x, py: this._p.y, cx: e.clientX, cy: e.clientY };
+  }
+  _moveDrag(e) {
+    if (!this._drag) return;
+    this._p = { ...this._p,
+      x: this._drag.px + e.clientX - this._drag.cx,
+      y: this._drag.py + e.clientY - this._drag.cy,
+    };
+    this._clamp();
+  }
+  _endDrag() { this._drag = null; }
+
+  /* ── pointer resize ── */
+  _startResize(e) {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    this._rsz = { w: this._p.w, h: this._p.h, cx: e.clientX, cy: e.clientY };
+  }
+  _moveResize(e) {
+    if (!this._rsz) return;
+    this._resize(e.clientX - this._rsz.cx, e.clientY - this._rsz.cy);
+    this._rsz = { ...this._rsz, cx: e.clientX, cy: e.clientY };
+  }
+  _endResize() { this._rsz = null; }
+
+  /* ── snap ── */
+  _snap(corner) {
+    this._p = {
+      ...this._p,
+      x: corner.includes('r') ? innerWidth  - this._p.w - 8 : 8,
+      y: corner.includes('b') ? innerHeight - this._p.h - 8 : 8,
+    };
+    this._savePos(); this._applyPos();
+  }
+
+  /* ── keyboard ── */
+  _headerKey(e) {
+    if (!e.key.startsWith('Arrow')) return;
+    e.preventDefault();
+    if (e.altKey) {
+      const s = e.shiftKey ? 50 : 20;
+      this._resize(
+        e.key==='ArrowRight'? s : e.key==='ArrowLeft'? -s : 0,
+        e.key==='ArrowDown' ? s : e.key==='ArrowUp'  ? -s : 0,
+      );
+    } else {
+      const s = e.shiftKey ? 100 : 20;
+      this._move(
+        e.key==='ArrowRight'? s : e.key==='ArrowLeft'? -s : 0,
+        e.key==='ArrowDown' ? s : e.key==='ArrowUp'  ? -s : 0,
+      );
+    }
+  }
+
+  /* ── retry ── */
+  _retry() {
+    if (this._retries >= 3 || !this.src) return;
+    this._retries++;
+    this._loadState = 'loading';
+    if (this._vid) { this._vid.load(); }
+  }
+  _toggle() {
+    this.enabled = !this.enabled;
+    if (!this.enabled) this._vid?.pause();
+    const ann = this.renderRoot.getElementById('announcer');
+    if (ann) ann.textContent = `Sign language ${this.enabled ? 'enabled' : 'disabled'}`;
+  }
+
+  /* ── render ── */
+  render() {
+    const lbl   = this.lang === 'am' ? 'የምልክት ቋንቋ' : 'Sign language';
+    const hasV  = this._loadState !== 'no-src';
+
+    // Determine overlay content
+    let overlayHide = false;
+    let overlayContent = html``;
+    switch (this._loadState) {
+      case 'loading':
+        overlayContent = html`<div class="spinner"></div><span>Loading…</span>`;
+        break;
+      case 'ready':
+        overlayHide = true;
+        break;
+      case 'error':
+        overlayContent = html`
+          <span>⚠ Sign video unavailable</span>
+          ${this._retries < 3
+            ? html`<button style="margin-top:8px;min-height:32px;padding:4px 10px;border:1px solid #bda8d0;border-radius:6px;background:#49375a;color:#fff;cursor:pointer"
+                           @click=${this._retry}>Retry</button>`
+            : html`<span style="font-size:12px;margin-top:4px;color:#aaa">Check network</span>`}
+        `;
+        break;
+      case 'no-src':
+      default:
+        overlayContent = html`<span>${this.lang === 'am'
+          ? 'ለዚህ ትምህርት የምልክት ቪዲዮ የለም'
+          : 'No sign video yet.'}</span>`;
+    }
+
+    return html`
+      <div id="announcer" role="status" aria-live="polite" aria-atomic="true"></div>
+      <section>
+        <header
+          tabindex="0"
+          role="group"
+          aria-label="Sign window. Arrow keys move; Shift+arrows larger step; Alt+arrows resize."
+          @pointerdown=${this._startDrag}
+          @pointermove=${this._moveDrag}
+          @pointerup=${this._endDrag}
+          @pointercancel=${this._endDrag}
+          @keydown=${this._headerKey}
+        >
+          <strong>${lbl}</strong>
+          <span class="snaps">
+            <button @click=${() => this._snap('tr')} aria-label="Snap top-right">↗</button>
+            <button @click=${() => this._snap('br')} aria-label="Snap bottom-right">↘</button>
+           </span>
+           <button class="toggle" type="button" aria-label="Sign language: ${this.enabled ? 'on' : 'off'}" aria-pressed=${String(this.enabled)} @click=${this._toggle}>${this.enabled ? 'On' : 'Off'}</button>
+         </header>
+
+        <div class="body">
+          ${hasV && this.src ? html`
+            <video
+              playsinline muted preload="metadata"
+              src=${this.src}
+              aria-label="Sign language interpreter"
+              @loadedmetadata=${() => { this._loadState = 'ready'; }}
+              @error=${() => { this._loadState = 'error'; }}
+            ></video>
+          ` : ''}
+          <div class="${'overlay' + (overlayHide ? ' hidden' : '')}">
+            ${overlayContent}
+          </div>
+        </div>
+
+        <button
+          class="resize-btn"
+          aria-label="Drag to resize, or focus and use Alt+Arrow keys"
+          @pointerdown=${this._startResize}
+          @pointermove=${this._moveResize}
+          @pointerup=${this._endResize}
+          @pointercancel=${this._endResize}
+          @keydown=${(e) => {
+            if (!e.altKey || !e.key.startsWith('Arrow')) return;
+            e.preventDefault();
+            const s = e.shiftKey ? 50 : 20;
+            this._resize(
+              e.key==='ArrowRight'? s : e.key==='ArrowLeft'? -s : 0,
+              e.key==='ArrowDown' ? s : e.key==='ArrowUp'  ? -s : 0,
+            );
+          }}
+        >⤢</button>
+      </section>
+    `;
+  }
+}
+customElements.define('savanna-sign-window', SavannaSignWindow);
+
+/* ══════════════════════════════════════════════
+   2.  <savanna-audio-description>
+   Tasks 2.4
+══════════════════════════════════════════════ */
+class SavannaAudioDescription extends LitElement {
+
+  static properties = {
+    src:      { type: String },
+    textVtt:  { type: String, attribute: 'text-vtt' },
+    offsetMs: { type: Number, attribute: 'offset-ms' },
+    _prefs:   { state: true },
+    _status:  { state: true },
+  };
+
+  static styles = css`
+    :host { display:block; font:16px/1.5 system-ui; color:inherit; }
+    button, select {
+      min-height:44px; padding:8px 12px;
+      border:1px solid #72548a; border-radius:8px;
+      background:#fff; color:#241b2b; font:inherit; cursor:pointer;
+    }
+    button:focus-visible, select:focus-visible { outline:3px solid #e09b00; outline-offset:2px; }
+    .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:8px 0; }
+    p[role="status"] { margin:8px 0; font-size:14px; }
+  `;
+
+  constructor() {
+    super();
+    this.src      = '';
+    this.textVtt  = '';
+    this.offsetMs = 0;
+    const s       = readNs('ad');
+    this._prefs   = { enabled:false, extended:false, mode:'text', ...s };
+    this._status  = 'Audio description is off.';
+    this._cues    = [];
+    this._active  = '';
+    this._wasPlaying = false;
+    this._audio   = null;
+    this._media   = null;
+    // Expose current cue text for sandbox debug display
+    this._currentCueText = '';
+  }
+
+  connectedCallback() {
+    super.connectedCallback();
+    this._media = this.closest('savanna-player')?.media ?? null;
+    window.addEventListener('keydown',              this._shortcut);
+    window.addEventListener('savanna:timeupdate',   this._onTime);
+    if (this.textVtt) this._loadVtt();
+  }
+
+  disconnectedCallback() {
+    window.removeEventListener('keydown',             this._shortcut);
+    window.removeEventListener('savanna:timeupdate',  this._onTime);
+    this._stop();
+    super.disconnectedCallback();
+  }
+
+  firstUpdated() {
+    this._audio = this.renderRoot.querySelector('audio') || null;
+  }
+
+  updated() {
+    // Re-acquire reference each render cycle — <audio> is conditionally rendered
+    this._audio = this.renderRoot.querySelector('audio') || null;
+  }
+
+  _savePrefs() { writeNs('ad', this._prefs); }
+
+  async _loadVtt() {
+    try {
+      const r = await fetch(this.textVtt);
+      if (!r.ok) throw new Error(`${r.status}`);
+      this._cues = this._parseVtt(await r.text());
+    } catch {
+      this._status = 'Text description file could not be loaded.';
+      this.requestUpdate();
+    }
+  }
+
+  _parseVtt(text) {
+    const toSec = (s) => {
+      const pts = s.trim().split(':').map(Number);
+      return pts.length === 3 ? pts[0]*3600+pts[1]*60+pts[2] : pts[0]*60+pts[1];
+    };
+    return text.replace(/\r/g,'').split(/\n{2,}/).flatMap(b => {
+      const lines = b.split('\n');
+      const i = lines.findIndex(l => l.includes('-->'));
+      if (i < 0) return [];
+      const [a, b2] = lines[i].split('-->');
+      return [{ start: toSec(a), end: toSec(b2), text: lines.slice(i+1).join(' ').trim() }];
+    }).filter(c => c.text);
+  }
+
+  _shortcut = (e) => {
+    if (e.key.toLowerCase() !== 'd') return;
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    if (['INPUT','TEXTAREA','SELECT'].includes(e.target?.tagName)) return;
+    e.preventDefault();
+    this._prefs.enabled ? this._stop() : this._play();
+  };
+
+  _onTime = (e) => {
+    const d = e.detail;
+    if (!d || !this._prefs.enabled) return;
+
+    const cue = this._cues.find(c => d.time >= c.start && d.time < c.end);
+    const debugCue = document.getElementById('adCueDisp');
+    if (debugCue) debugCue.textContent = cue?.text || '—';
+
+    if (this._prefs.mode === 'text') {
+      if (cue && cue.text !== this._active) {
+        this._active = cue.text;
+        this._status = cue.text;
+        this._currentCueText = cue.text;
+        // Push to sandbox debug display
+        this.requestUpdate();
+      } else if (!cue && this._active) {
+        this._active = '';
+        this._currentCueText = '';
+      }
+      return;
+    }
+
+    if (this._prefs.mode === 'audio' && this._audio && this.src) {
+      const target = Math.max(0, d.time - this.offsetMs / 1000);
+      if (Math.abs(this._audio.currentTime - target) > 0.45) {
+        try { this._audio.currentTime = target; } catch {}
+      }
+      this._audio.playbackRate = d.rate || 1;
+      if (d.paused) { this._audio.pause(); }
+      else if (this._audio.paused) { this._audio.play().catch(() => {}); }
+    }
+  };
+
+  async _play() {
+    this._prefs = { ...this._prefs, enabled: true };
+    this._savePrefs();
+
+    if (this._prefs.mode === 'text') {
+      this._status = this._active || 'Text descriptions enabled — play the video.';
+      this.requestUpdate(); return;
+    }
+
+    if (!this.src || !this._audio) {
+      this._status = 'No recorded description file. Switch to Text mode.';
+      this.requestUpdate(); return;
+    }
+
+    if (this._media) {
+      this._wasPlaying = !this._media.paused;
+      try { this._audio.currentTime = Math.max(0, this._media.currentTime - this.offsetMs / 1000); } catch {}
+      this._audio.playbackRate = this._media.playbackRate;
+    }
+
+    try { await this._audio.play(); this._status = 'Audio description playing.'; }
+    catch { this._status = 'Press Play to start the description.'; }
+    this.requestUpdate();
+  }
+
+  _stop() {
+    this._audio?.pause();
+    if (this._prefs.extended && this._wasPlaying) this._media?.play().catch(() => {});
+    this._wasPlaying = false;
+    this._prefs  = { ...this._prefs, enabled: false };
+    this._status = 'Audio description stopped.';
+    this._savePrefs();
+    this.requestUpdate();
+  }
+
+  _setExtended(v) {
+    this._prefs = { ...this._prefs, extended: v };
+    this._savePrefs();
+    if (v && this._audio && !this._audio.paused) {
+      this._wasPlaying = !!this._media && !this._media.paused;
+      this._media?.pause();
+    }
+    this.requestUpdate();
+  }
+
+  render() {
+    return html`
+      <div class="row">
+        <label style="margin:0">Mode
+          <select .value=${this._prefs.mode}
+            @change=${(e) => { this._prefs={...this._prefs,mode:e.target.value}; this._savePrefs(); this.requestUpdate(); }}>
+            <option value="text">Text descriptions</option>
+            <option value="audio">Recorded audio</option>
+          </select>
+        </label>
+        <button @click=${this._play}>▶ Play</button>
+        <button @click=${this._stop}>⏹ Stop</button>
+        <label style="margin:0">
+          <input type="checkbox" .checked=${this._prefs.extended}
+            @change=${(e) => this._setExtended(e.target.checked)}>
+          Extended AD (pause video)
+        </label>
+      </div>
+
+      ${this.src ? html`
+      <audio preload="metadata" src=${this.src}
+        @play=${() => {
+          if (this._prefs.extended) {
+            this._wasPlaying = !!this._media && !this._media.paused;
+            this._media?.pause();
+          }
+        }}
+        @ended=${() => {
+          if (this._prefs.extended && this._wasPlaying) this._media?.play().catch(()=>{});
+          this._wasPlaying = false;
+          this._prefs = { ...this._prefs, enabled: false };
+          this._savePrefs();
+          this._status = 'Description finished.';
+          this.requestUpdate();
+        }}
+        @error=${() => { this._status = 'Recorded description failed to load.'; this.requestUpdate(); }}
+      ></audio>
+      ` : ''}
+
+      <p role="status" aria-live="polite">${this._status}</p>
+    `;
+  }
+}
+customElements.define('savanna-audio-description', SavannaAudioDescription);
+
+/* ══════════════════════════════════════════════
+   3.  <savanna-offline>
+   Task 2.6
+══════════════════════════════════════════════ */
+class SavannaOffline extends LitElement {
+
+  static properties = {
+    api:       { type: String },
+    apiKey:    { type: String, attribute: 'api-key' },
+    lessonId:  { type: String, attribute: 'lesson-id' },
+    _manifest: { state: true },
+    _status:   { state: true },
+    _busy:     { state: true },
+    _progress: { state: true },
+    _saved:    { state: true },
+  };
+
+  static styles = css`
+    :host { display:block; font:16px/1.5 system-ui; }
+    button {
+      min-height:44px; padding:9px 14px;
+      border:0; border-radius:9px;
+      background:#5b3477; color:#fff; font:inherit; cursor:pointer;
+      margin:4px 4px 4px 0;
+    }
+    button:focus-visible { outline:3px solid #e09b00; outline-offset:3px; }
+    button:disabled { opacity:.5; cursor:not-allowed; }
+    progress { width:min(100%,360px); height:18px; display:block; margin:6px 0; }
+    p[role="status"] { font-size:14px; margin:6px 0; }
+  `;
+
+  constructor() {
+    super();
+    this.api       = '';
+    this.apiKey    = '';
+    this.lessonId  = '';
+    this._manifest = null;
+    this._status   = 'Connecting to API…';
+    this._busy     = false;
+    this._progress = 0;
+    this._saved    = false;
+    this._CACHE_PFX = 'savanna-pack-';
+  }
+
+  connectedCallback() {
+    super.connectedCallback();
+    const ol = readNs('offline');
+    this._saved = (ol.savedLessons || []).includes(this.lessonId);
+    this._fetchManifest();
+  }
+
+  get _headers()  { return this.apiKey ? {'X-Savanna-Key': this.apiKey} : {}; }
+  get _packUrl()  { return `${this.api.replace(/\/$/,'')}/v1/lessons/${encodeURIComponent(this.lessonId)}/pack`; }
+
+  _fmtSize(n) {
+    if (n < 1024)    return `${n} B`;
+    if (n < 1048576) return `${(n/1024).toFixed(1)} KB`;
+    return `${(n/1048576).toFixed(2)} MB`;
+  }
+
+  async _fetchManifest() {
+    if (!this.api || !this.lessonId) { this._status='Set api and lesson-id attributes.'; return; }
+    try {
+      const r = await fetch(this._packUrl, { headers: this._headers });
+      if (!r.ok) throw new Error(
+        r.status === 404 ? 'Pack not published for this lesson.'
+                         : `Manifest error (${r.status}).`
+      );
+      this._manifest = await r.json();
+      this._status = `Pack ready · ${this._fmtSize(this._manifest.sizeBytes || 0)}`;
+    } catch (err) {
+      this._status = err.message + ' — is the mock API running? (npm run mock)';
+    }
+    this.requestUpdate();
+  }
+
+  async _save() {
+    if (this._busy || !this._manifest) return;
+    this._busy = true; this._progress = 0; this.requestUpdate();
+    try {
+      const url = this._packUrl + '.zip';
+      const r   = await fetch(url, { headers: this._headers });
+      if (!r.ok) throw new Error(`Download failed (${r.status}).`);
+      const total  = Number(r.headers.get('content-length')) || this._manifest.sizeBytes || 0;
+      const reader = r.body.getReader();
+      const chunks = []; let got = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) {
+          chunks.push(value);
+          got += value.length;
+          this._progress = total ? Math.round(got / total * 100) : 0;
+          this.requestUpdate();
+        }
+      }
+      const blob  = new Blob(chunks, { type: 'application/zip' });
+      const cache = await caches.open(this._CACHE_PFX + this.lessonId);
+      await cache.put(url, new Response(blob, {
+        headers: { 'Content-Type':'application/zip', 'Content-Length': String(blob.size) },
+      }));
+      const ol = readNs('offline');
+      ol.savedLessons = [...new Set([...(ol.savedLessons||[]), this.lessonId])];
+      writeNs('offline', ol);
+      this._saved = true; this._progress = 100;
+      this._status = `Saved offline · ${this._fmtSize(blob.size)}`;
+    } catch (err) {
+      this._status = err.message;
+    }
+    this._busy = false; this.requestUpdate();
+  }
+
+  async _remove() {
+    await caches.delete(this._CACHE_PFX + this.lessonId);
+    const ol = readNs('offline');
+    ol.savedLessons = (ol.savedLessons||[]).filter(x => x !== this.lessonId);
+    writeNs('offline', ol);
+    this._saved = false; this._progress = 0;
+    this._status = 'Offline copy deleted.';
+    this.requestUpdate();
+  }
+
+  render() {
+    return html`
+      <div>
+        ${this._saved
+          ? html`<button @click=${this._remove} ?disabled=${this._busy}>Delete offline copy</button>`
+          : html`<button @click=${this._save}   ?disabled=${this._busy || !this._manifest}>Save for offline</button>`}
+        <button @click=${() => this._fetchManifest()} ?disabled=${this._busy}>↺ Refresh</button>
+      </div>
+      ${this._busy ? html`<progress max="100" .value=${this._progress}></progress>` : ''}
+      <p role="status" aria-live="polite">${this._status}</p>
+    `;
+  }
+}
+customElements.define('savanna-offline', SavannaOffline);
+
+/* ══════════════════════════════════════════════
+   FAKE C2 PLAYER
+   Emits the same event contract as Member 1's
+   real player so components need no changes.
+══════════════════════════════════════════════ */
+const vid   = document.getElementById('vid');
+const tDisp = document.getElementById('timeDisp');
+const evLog = document.getElementById('evLog');
+let evQueue = [];
+
+function fmt(s) {
+  if (!s || isNaN(s)) return '0:00';
+  return `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+}
+
+function emit(name, detail) {
+  window.dispatchEvent(new CustomEvent(name, { bubbles:true, composed:true, detail }));
+  evQueue.push(`${name.replace('savanna:','')} @ ${(detail.time??0).toFixed(2)}s`);
+  if (evQueue.length > 6) evQueue.shift();
+  evLog.innerHTML = evQueue.map(e => `<span class="ev">${e}</span>`).join('');
+}
+
+// Sign cue data matching en.vtt timing
+const SIGN_CUES = [
+  { start: 0,  end: 4,  text: 'Welcome to the lesson.' },
+  { start: 4,  end: 8,  text: 'Today we learn what a database is.' },
+  { start: 8,  end: 12, text: 'Data is stored in tables.' },
+];
+
+vid.addEventListener('timeupdate', () => {
+  const t = vid.currentTime;
+  emit('savanna:timeupdate', { time: t, paused: vid.paused, rate: vid.playbackRate });
+  tDisp.textContent = `${fmt(t)} / ${fmt(vid.duration)}`;
+  // Update sign cue debug display
+  const cue = SIGN_CUES.find(c => t >= c.start && t < c.end);
+  const sc  = document.getElementById('signCueDisp');
+  if (sc) sc.textContent = cue ? cue.text : '—';
+});
+vid.addEventListener('play',   () => emit('savanna:play',   { time: vid.currentTime }));
+vid.addEventListener('pause',  () => emit('savanna:pause',  { time: vid.currentTime }));
+vid.addEventListener('seeked', () => emit('savanna:seeked', { time: vid.currentTime }));
+vid.addEventListener('loadedmetadata', () => {
+  tDisp.textContent = `0:00 / ${fmt(vid.duration)}`;
+});
+
+/* ── wire up static buttons (no inline onclick, works in module scope) ── */
+document.getElementById('btnPlay').addEventListener('click',  () => vid.play());
+document.getElementById('btnPause').addEventListener('click', () => vid.pause());
+document.getElementById('btnReset').addEventListener('click', () => { vid.currentTime = 0; });
+document.getElementById('selSpeed').addEventListener('change', (e) => {
+  vid.playbackRate = parseFloat(e.target.value);
+});
+
+/* ── online/offline indicator ── */
+function updateNet() {
+  const badge = document.getElementById('netBadge');
+  if (navigator.onLine) { badge.textContent='● Online';  badge.className='online'; }
+  else                  { badge.textContent='● Offline'; badge.className='offline'; }
+}
+window.addEventListener('online',  updateNet);
+window.addEventListener('offline', updateNet);
+updateNet();
+
+/* ══════════════════════════════════════════════
+   MOUNT COMPONENTS
+══════════════════════════════════════════════ */
+// Give custom element registry a tick to process, then mount
+setTimeout(() => {
+
+  // ── sign window ──
+  const signHost = document.getElementById('sign-host');
+  signHost.innerHTML = '';
+  const sw = document.createElement('savanna-sign-window');
+  // Use the ESL placeholder (small file) as sign video so metadata loads fast
+  sw.setAttribute('src',  '../../contracts/fixtures/media/esl-placeholder.mp4');
+  sw.setAttribute('lang', 'en');
+   signHost.appendChild(sw);
+   requestAnimationFrame(() => {
+     const saved = readNs('sign');
+     if (typeof saved.x !== 'number' || typeof saved.y !== 'number') {
+       sw._p = { x: Math.max(8, signHost.clientWidth - 328), y: 8, w: 320, h: 180 };
+       sw._savePos();
+       sw._applyPos();
+     }
+   });
+
+  // ── audio description ──
+  const ad = document.createElement('savanna-audio-description');
+  ad.setAttribute('src',      '../../contracts/fixtures/media/ad.opus');
+  ad.setAttribute('text-vtt', '../../contracts/fixtures/media/ad.vtt');
+  document.getElementById('ad-host').appendChild(ad);
+
+  // ── offline ──
+  const ol = document.createElement('savanna-offline');
+  ol.setAttribute('api',       'http://localhost:4010');
+  ol.setAttribute('lesson-id', 'L-102');
+  document.getElementById('ol-host').appendChild(ol);
+
+  console.log('%c✓ Member 2 Sandbox Ready', 'color:#4caf50;font-weight:bold;font-size:15px');
+  console.log('  Three errors fixed:');
+  console.log('  • CSP: Chrome DevTools probe — browser-generated, not application code');
+  console.log('  • 404: L-102/pack.json fixture created');
+  console.log('  • Lit bare imports: switched to esm.sh self-contained bundles');
+  console.log('  Press D to toggle audio description');
+  console.log('  Tab → sign-window header → Arrow keys to move');
+
+}, 0);
+</script>
+</body>
+</html>

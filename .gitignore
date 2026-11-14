@@ -5,3 +5,5 @@ dist
 *.log
 coverage
 .vite
+cert.pem
+key.pem

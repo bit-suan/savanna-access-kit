@@ -1,0 +1,1 @@
+export async function registerSavannaMediaWorker(url='/media-sw.js'){if(!('serviceWorker'in navigator))return null;try{const r=await navigator.serviceWorker.register(url,{scope:'/'});if(navigator.storage?.persist)await navigator.storage.persist().catch(()=>false);return r;}catch(e){console.warn('Offline support unavailable',e);return null;}}

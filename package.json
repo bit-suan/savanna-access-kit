@@ -1,6 +1,7 @@
 {
   "name": "savanna-access-kit",
   "private": true,
+  "version": "1.0.0",
   "type": "module",
   "packageManager": "pnpm@9.15.0",
   "engines": {
@@ -9,6 +10,7 @@
   "scripts": {
     "mock": "node contracts/mock/server.js",
     "format": "prettier --write .",
+    "test": "node --test packages/pipeline/src/pack/*.test.mjs packages/components/src/**/*.test.ts packages/components/src/member2-a11y.test.ts",
     "ui": "pnpm --filter sandbox-career ui",
     "career": "pnpm --filter sandbox-career dev",
     "dev:api": "pnpm --filter @savanna/api dev",
@@ -16,7 +18,9 @@
   },
   "dependencies": {
     "cors": "^2.8.5",
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "archiver": "^7.0.1",
+    "lit": "^3.2.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

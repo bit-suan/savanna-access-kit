@@ -1,0 +1,4 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';
+test('pack builder enforces lesson id, transcript size and both caption tracks',async()=>{const s=await readFile(new URL('./build-pack.mjs',import.meta.url),'utf8');assert.match(s,/valid --lesson id/);assert.match(s,/50\*1024/);assert.match(s,/captions-am.vtt/);assert.match(s,/captions-en.vtt/);});
+test('pack builder includes optional sign media and a standalone lesson page',async()=>{const s=await readFile(new URL('./build-pack.mjs',import.meta.url),'utf8');assert.match(s,/sign\.mp4/);assert.match(s,/sign\.webm/);assert.match(s,/lesson\.html/);assert.match(s,/standalone:'lesson\.html'/);});
+test('sign metadata is human-interpreted and not auto-approved',async()=>{const s=await readFile(new URL('./sign-metadata.mjs',import.meta.url),'utf8');assert.match(s,/human-interpreted/);assert.match(s,/approved:false/);});

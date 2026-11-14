@@ -1,0 +1,21 @@
+{
+  "id": "L-102",
+  "version": 1,
+  "createdAt": "2024-01-01T00:00:00.000Z",
+  "sizeBytes": 212000,
+  "content": {
+    "audio": "lesson.opus",
+    "captions": { "en": "en.vtt", "am": "am.vtt" },
+    "transcript": "transcript.html",
+    "audioDescription": { "audio": "ad.opus", "text": "ad.vtt" },
+    "optionalVideo": null
+  },
+  "files": [
+    { "path": "lesson.opus",  "sizeBytes": 24808,  "sha256": "placeholder-opus" },
+    { "path": "en.vtt",       "sizeBytes": 176,    "sha256": "placeholder-en" },
+    { "path": "am.vtt",       "sizeBytes": 284,    "sha256": "placeholder-am" },
+    { "path": "ad.opus",      "sizeBytes": 9664,   "sha256": "placeholder-ad-opus" },
+    { "path": "ad.vtt",       "sizeBytes": 133,    "sha256": "placeholder-ad-vtt" },
+    { "path": "transcript.html","sizeBytes": 1200, "sha256": "placeholder-transcript" }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "archiver": "^8.0.0",
+    "lit": "^3.3.3"
+  }
+}
