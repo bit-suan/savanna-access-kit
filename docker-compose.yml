@@ -23,6 +23,9 @@ services:
       PORT: 4010
       STORE: memory
       DATABASE_URL: postgresql://savanna:savanna@db:5432/savanna
+    volumes:
+      - ./api:/app/api
+      - ./contracts:/app/contracts
 
   db:
     profiles: ["full"]
