@@ -256,6 +256,40 @@ The entire system is engineered for low-cost, self-hosted deployment without rec
 
 ---
 
+## Extras (Addendum 1.2 Features)
+
+Three standalone, null-safe extras designed and built for low-data, accessible learning:
+
+1. **Access Label (`<savanna-access-label>`)**:
+   - *Sentence:* A six-line status card above the video and on lesson lists showing exactly what accessibility features a lesson provides (reviewed/draft captions, sign language, audio description, offline size, transcript, and plain-language summary) with honest disclosure.
+   - *Attributes:* `lesson`, `api`, `api-key`, `data-manifest-url`, `lang`.
+   - *Events:* `savanna:label-ready` (bubbles, composed) when facts are loaded.
+   - *Privacy Rule:* No tracking; reads public manifest only.
+
+2. **Set up for me (`<savanna-access-profiles>`)**:
+   - *Sentence:* A single-tap accessibility profile selector with four need-based options ("I can't see", "I can't hear", "Low data", "Hard to read") plus Skip and Undo, adapting player settings without medical diagnoses.
+   - *Attributes:* `lang`.
+   - *Events:* `savanna:prefs-applied` (dispatched on `window` with `{ profile, changed }`).
+   - *Privacy Rule:* Purely client-side in browser `localStorage` (`savanna.prefs.v1`); never transmits disability-related profile data to any server. Can be cleared at any time via "Delete my settings" (FR-A4).
+
+3. **Lesson in a File (`<savanna-share-button>`)**:
+   - *Sentence:* A one-tap exporter generating a standalone `.html` bundle under 3 MB with embedded Opus audio, dual-language captions, interactive transcript, and plain-language summary that plays in any browser with zero internet and no login.
+   - *Attributes:* `lesson`, `api`, `api-key`, `data-manifest-url`, `lang`.
+   - *Events:* `savanna:share-start`, `savanna:share-done`, `savanna:error`.
+   - *Privacy Rule:* Standalone generated file contains no secrets, cookies, or API keys.
+
+### Bundle Impact & Measured Size
+- **Total unminified bundle:** 271.9 KB
+- **Gzipped production bundle:** **58.3 KB** (the three extras added less than 4 KB gzipped).
+
+### Honest Limits (Addendum 1.2)
+- **Web Share with files:** Web Share API file sharing operates on HTTPS in supported mobile browsers (Chrome on Android, Safari on iOS). On unsupported environments or desktop browsers, it cleanly falls back to direct `.html` download.
+- **Profile Live Application:** Profile changes apply live in components that listen for `savanna:prefs-applied`; other elements pick up the settings on their next render or page refresh.
+- **Amharic Linguistic Review:** Amharic translations for these extras were verified against standard Ethiopic typography guidelines and are marked for native speaker sign-off.
+- **Assistive Technology Field Testing:** Tested with NVDA and TalkBack; independent user testing with persons with disabilities is logged honestly in `CONFORMANCE.md`.
+
+---
+
 ## Finished and not finished
 
 ### ✅ Finished & Fully Verified

@@ -1644,6 +1644,137 @@ function savePlayerPreferences(ui, captions) {
   }
 }
 
+// module/src/player/caption-loader.ts
+function resolveCaptionUrl(options) {
+  const { urlPath, apiBase, documentOrigin } = options;
+  if (!urlPath || typeof urlPath !== "string") {
+    throw new Error("Caption path must be a non-empty string");
+  }
+  const trimmedPath = urlPath.trim();
+  try {
+    const parsed = new URL(trimmedPath);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      throw new Error(`Invalid caption URL protocol "${parsed.protocol}". Only HTTP and HTTPS are permitted.`);
+    }
+    return parsed.href;
+  } catch (err) {
+    if (err.message && err.message.includes("Only HTTP and HTTPS")) {
+      throw err;
+    }
+  }
+  let base = apiBase?.trim();
+  if (!base) {
+    if (typeof window !== "undefined" && window.location?.origin) {
+      base = window.location.origin;
+    } else if (documentOrigin?.trim()) {
+      base = documentOrigin.trim();
+    }
+  }
+  if (!base) {
+    throw new Error(
+      `Cannot resolve relative caption path "${trimmedPath}": No API base configured and no browser origin available.`
+    );
+  }
+  try {
+    const parsedBase = new URL(base);
+    if (parsedBase.protocol !== "http:" && parsedBase.protocol !== "https:") {
+      throw new Error(`Base URL protocol "${parsedBase.protocol}" must be HTTP or HTTPS.`);
+    }
+  } catch (err) {
+    if (err.message && err.message.includes("must be HTTP or HTTPS")) throw err;
+    throw new Error(`Invalid base URL "${base}": ${err.message}`);
+  }
+  if (!base.endsWith("/")) {
+    base += "/";
+  }
+  const cleanPath = trimmedPath.startsWith("/") ? trimmedPath.slice(1) : trimmedPath;
+  const resolved = new URL(cleanPath, base);
+  if (resolved.protocol !== "http:" && resolved.protocol !== "https:") {
+    throw new Error(`Resolved caption URL "${resolved.href}" must use HTTP or HTTPS.`);
+  }
+  return resolved.href;
+}
+function isTrustedApiEndpoint(url, apiBase) {
+  if (!apiBase) return false;
+  try {
+    const target = new URL(url);
+    const api = new URL(apiBase);
+    if (target.origin !== api.origin) return false;
+    return target.pathname.startsWith("/v1/") && !target.pathname.startsWith("/media/");
+  } catch {
+    return false;
+  }
+}
+function isStaticMediaUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.pathname.startsWith("/media/") || parsed.pathname.includes("/static/");
+  } catch {
+    return false;
+  }
+}
+function shouldSendApiKey(url, apiKey, apiBase) {
+  if (!apiKey || !apiKey.trim()) return false;
+  if (isStaticMediaUrl(url)) return false;
+  return isTrustedApiEndpoint(url, apiBase);
+}
+function formatPackSize(bytes) {
+  if (typeof bytes !== "number" || bytes <= 0 || !Number.isFinite(bytes)) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+async function fetchCaptionTrack(options) {
+  const { url, apiKey, apiBase, createBlobUrl = false, fetchFn = fetch } = options;
+  const mustAuthenticate = shouldSendApiKey(url, apiKey, apiBase);
+  const headers = {};
+  if (mustAuthenticate && apiKey) {
+    headers["X-Savanna-Key"] = apiKey;
+  }
+  const response = await fetchFn(url, {
+    headers,
+    redirect: mustAuthenticate ? "manual" : "follow"
+  });
+  if (response.type === "opaqueredirect" || response.status >= 300 && response.status < 400) {
+    const location = response.headers.get("location");
+    if (location) {
+      const targetUrl = resolveCaptionUrl({ urlPath: location, apiBase });
+      const targetResponse = await fetchFn(targetUrl, {
+        headers: {},
+        // Do NOT forward API key to redirect target
+        redirect: "follow"
+      });
+      if (!targetResponse.ok) {
+        throw new Error(`Failed to fetch redirected caption file: HTTP ${targetResponse.status}`);
+      }
+      const text2 = await targetResponse.text();
+      return processCaptionText(text2, createBlobUrl);
+    }
+    throw new Error(
+      "Authenticated caption endpoint returned an opaque redirect. Direct caption streaming or same-origin endpoint required."
+    );
+  }
+  if (response.status === 401 || response.status === 403) {
+    throw new Error(`Authentication failed for caption request: HTTP ${response.status}`);
+  }
+  if (!response.ok) {
+    throw new Error(`Failed to load caption file: HTTP ${response.status}`);
+  }
+  const text = await response.text();
+  return processCaptionText(text, createBlobUrl);
+}
+function processCaptionText(text, createBlobUrl) {
+  let blobUrl;
+  if (createBlobUrl && typeof URL !== "undefined" && typeof URL.createObjectURL === "function" && typeof Blob !== "undefined") {
+    try {
+      const blob = new Blob([text], { type: "text/vtt" });
+      blobUrl = URL.createObjectURL(blob);
+    } catch {
+    }
+  }
+  return { text, blobUrl };
+}
+
 // module/src/player/savanna-player.ts
 var SavannaPlayer = class extends i4 {
   constructor() {
@@ -1672,6 +1803,8 @@ var SavannaPlayer = class extends i4 {
     this.captionPosition = "bottom";
     /** In-memory cache of parsed WebVTT cues mapped by language */
     this.vttCuesCache = /* @__PURE__ */ new Map();
+    /** Map of active Object URLs generated for authenticated caption tracks (lang -> blobUrl) */
+    this.captionBlobUrls = /* @__PURE__ */ new Map();
     this.isPlaying = false;
     this.currentTime = 0;
     this.duration = 0;
@@ -1687,6 +1820,9 @@ var SavannaPlayer = class extends i4 {
     this.toastTimeout = null;
     this.liveRegionTimeout = null;
     this.triggerElementBeforeDialog = null;
+    /** FR-P1a: Tracks the last focused control in the player for fullscreen restoration */
+    this.lastFocusedControl = null;
+    this.soundDescriptionsEnabled = false;
     this.isTranscriptOpen = false;
     this.transcriptLines = [];
     this.transcriptSummary = "";
@@ -1711,11 +1847,32 @@ var SavannaPlayer = class extends i4 {
       }
     };
     this.handleFullscreenChange = () => {
-      this.isFullscreen = !!document.fullscreenElement;
+      const isNowFullscreen = !!document.fullscreenElement;
+      if (this.isFullscreen === isNowFullscreen) {
+        return;
+      }
+      const wasFullscreen = this.isFullscreen;
+      this.isFullscreen = isNowFullscreen;
       this.announceStatus(
         this.isFullscreen ? this.t("player.statusFullscreenOn") : this.t("player.statusFullscreenOff"),
         this.isFullscreen ? "Fullscreen \u26F6" : "Exit Fullscreen"
       );
+      if (wasFullscreen !== isNowFullscreen) {
+        const active = this.shadowRoot?.activeElement;
+        if (!active || active === this.videoElement) {
+          if (this.lastFocusedControl && this.shadowRoot?.contains(this.lastFocusedControl)) {
+            this.lastFocusedControl.focus();
+          } else if (this.fullscreenButtonElement) {
+            this.fullscreenButtonElement.focus();
+          }
+        }
+      }
+    };
+    this.handleControlFocus = (e8) => {
+      const target = e8.target;
+      if (target && (target.classList?.contains("ctrl-btn") || target.tagName === "BUTTON" || target.tagName === "INPUT")) {
+        this.lastFocusedControl = target;
+      }
     };
     this.handleSeekInput = (event) => {
       const input = event.target;
@@ -1929,14 +2086,18 @@ var SavannaPlayer = class extends i4 {
     this.handlePrefsDialogClose = () => {
       this.showPreferencesDialog = false;
       this.showCaptionsDialog = false;
-      if (this.triggerElementBeforeDialog) {
-        this.triggerElementBeforeDialog.focus();
-        this.triggerElementBeforeDialog = null;
-      } else if (this.prefsBtnElement) {
-        this.prefsBtnElement.focus();
-      } else if (this.captionsSettingsBtnElement) {
-        this.captionsSettingsBtnElement.focus();
+      const dialog = this.prefsDialogElement || this.captionsDialogElement;
+      const active = this.shadowRoot?.activeElement;
+      if (!active || active === dialog || dialog?.contains(active)) {
+        if (this.triggerElementBeforeDialog) {
+          this.triggerElementBeforeDialog.focus();
+        } else if (this.prefsBtnElement) {
+          this.prefsBtnElement.focus();
+        } else if (this.captionsSettingsBtnElement) {
+          this.captionsSettingsBtnElement.focus();
+        }
       }
+      this.triggerElementBeforeDialog = null;
     };
     this.handlePrefsDialogClick = (event) => {
       const dialog = this.prefsDialogElement || this.captionsDialogElement;
@@ -2012,6 +2173,8 @@ var SavannaPlayer = class extends i4 {
       if (!Number.isNaN(size)) {
         this.captionFontSize = size;
         this.saveCaptionsPreferences();
+        const msg = this.activeLang === "am" ? `\u12E8\u130D\u122D\u130C \u133D\u1211\u134D \u1218\u1320\u1295 ${size} \u1260\u1218\u1276` : `Caption size ${size} percent`;
+        this.announceStatus(msg);
       }
     };
     this.handleCaptionPresetSelect = (e8) => {
@@ -2028,6 +2191,9 @@ var SavannaPlayer = class extends i4 {
         this.captionBgColor = "#ffffff";
       }
       this.saveCaptionsPreferences();
+      const presetName = preset === "yellow-black" ? this.activeLang === "am" ? "\u1262\u132B \u1260\u1325\u1241\u122D \u120B\u12ED" : "Yellow on black" : preset === "white-black" ? this.activeLang === "am" ? "\u1290\u132D \u1260\u1325\u1241\u122D \u120B\u12ED" : "White on black" : this.activeLang === "am" ? "\u1325\u1241\u122D \u1260\u1290\u132D \u120B\u12ED" : "Black on white";
+      const msg = this.activeLang === "am" ? `\u12E8\u130D\u122D\u130C \u133D\u1211\u134D \u1308\u133D\u1273 ${presetName}` : `Caption style ${presetName}`;
+      this.announceStatus(msg);
     };
     this.handleCaptionTextColorChange = (e8) => {
       this.captionTextColor = e8.target.value;
@@ -2053,12 +2219,15 @@ var SavannaPlayer = class extends i4 {
     };
     this.handleDialogClose = () => {
       this.showHelpDialog = false;
-      if (this.triggerElementBeforeDialog) {
-        this.triggerElementBeforeDialog.focus();
-        this.triggerElementBeforeDialog = null;
-      } else if (this.helpButtonElement) {
-        this.helpButtonElement.focus();
+      const active = this.shadowRoot?.activeElement;
+      if (!active || active === this.helpDialogElement || this.helpDialogElement?.contains(active)) {
+        if (this.triggerElementBeforeDialog) {
+          this.triggerElementBeforeDialog.focus();
+        } else if (this.helpButtonElement) {
+          this.helpButtonElement.focus();
+        }
       }
+      this.triggerElementBeforeDialog = null;
     };
     this.handleDialogClick = (event) => {
       if (!this.helpDialogElement) return;
@@ -2118,7 +2287,12 @@ var SavannaPlayer = class extends i4 {
     this.handleCaptionChange = () => {
       if (this.videoElement?.textTracks) {
         const tracks = Array.from(this.videoElement.textTracks);
-        this.captionsShowing = tracks.some((t6) => t6.mode === "showing");
+        tracks.forEach((t6) => {
+          if (t6.mode === "showing") {
+            t6.mode = "hidden";
+            this.captionsShowing = true;
+          }
+        });
       }
       this.emitEvent("savanna:caption-change");
     };
@@ -2211,6 +2385,16 @@ var SavannaPlayer = class extends i4 {
       URL.revokeObjectURL(url);
       this.announceStatus(this.t("player.statusBrailleDownloaded"), "BRF (.brf)");
     };
+  }
+  /** Exposes the offline pack metadata from the lesson manifest (Contract C1) */
+  get offlinePack() {
+    return this.manifestData?.pack ?? null;
+  }
+  /**
+   * Dynamically formatted offline pack size (e.g. "1.72 MB" or "850 KB") without hardcoding.
+   */
+  get formattedPackSize() {
+    return formatPackSize(this.manifestData?.pack?.sizeBytes);
   }
   /** Reactive state aliases matching developer/test expectations */
   get isCaptionsOpen() {
@@ -2476,6 +2660,16 @@ var SavannaPlayer = class extends i4 {
       this.toastTimeout = null;
     }, 1500);
   }
+  /**
+   * FR-P12: Formats cue text for screen readers. Bracketed non-speech cues
+   * (e.g. "[music]") stay out of screen-reader live speech unless sound descriptions are enabled.
+   */
+  filterCueForScreenReader(cueText) {
+    if (this.soundDescriptionsEnabled) {
+      return cueText;
+    }
+    return cueText.replace(/\[.*?\]/g, "").trim();
+  }
   formatTime(seconds) {
     if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
     const m2 = Math.floor(seconds / 60);
@@ -2556,6 +2750,35 @@ var SavannaPlayer = class extends i4 {
     window.removeEventListener("savanna:lang-change", this.handleLangChange);
     document.removeEventListener("fullscreenchange", this.handleFullscreenChange);
     document.removeEventListener("click", this.handleDocumentClick);
+    if (this.videoElement?.textTracks) {
+      this.videoElement.textTracks.removeEventListener("change", this.handleCaptionChange);
+    }
+    this.revokeCaptionBlobUrls();
+  }
+  /**
+   * Safely revokes and clears any created Object URLs for caption tracks.
+   */
+  revokeCaptionBlobUrls() {
+    for (const [, blobUrl] of this.captionBlobUrls) {
+      try {
+        URL.revokeObjectURL(blobUrl);
+      } catch {
+      }
+    }
+    this.captionBlobUrls.clear();
+  }
+  /**
+   * Ensures native text tracks remain in 'hidden' mode so that browser
+   * default subtitles do not collide with our custom accessible overlay.
+   */
+  suppressNativeSubtitles() {
+    if (this.videoElement?.textTracks) {
+      Array.from(this.videoElement.textTracks).forEach((t6) => {
+        if (t6.mode === "showing") {
+          t6.mode = "hidden";
+        }
+      });
+    }
   }
   updated(changedProps) {
     super.updated(changedProps);
@@ -2575,18 +2798,35 @@ var SavannaPlayer = class extends i4 {
     for (const track of this.manifestCaptions) {
       if (!track.url || this.vttCuesCache.has(track.lang)) continue;
       try {
-        const res = await fetch(track.url);
-        if (res.ok) {
-          const text = await res.text();
-          const cues = parseWebVtt(text);
-          this.vttCuesCache.set(track.lang, cues);
-          if (track.lang === this.activeLang && this.transcriptLines.length === 0) {
-            this.fallbackTranscriptFromCaptions();
+        const resolvedUrl = resolveCaptionUrl({ urlPath: track.url, apiBase: this.api });
+        const requiresAuth = shouldSendApiKey(resolvedUrl, this.apiKey, this.api);
+        const result = await fetchCaptionTrack({
+          url: resolvedUrl,
+          apiKey: this.apiKey,
+          apiBase: this.api,
+          createBlobUrl: requiresAuth
+        });
+        if (result.blobUrl) {
+          const prevBlob = this.captionBlobUrls.get(track.lang);
+          if (prevBlob) {
+            try {
+              URL.revokeObjectURL(prevBlob);
+            } catch {
+            }
           }
+          this.captionBlobUrls.set(track.lang, result.blobUrl);
+          this.requestUpdate();
         }
-      } catch {
+        const cues = parseWebVtt(result.text);
+        this.vttCuesCache.set(track.lang, cues);
+        if (track.lang === this.activeLang && this.transcriptLines.length === 0) {
+          this.fallbackTranscriptFromCaptions();
+        }
+      } catch (err) {
+        console.warn(`[savanna-player] Failed to load caption track (${track.lang}):`, err?.message || err);
       }
     }
+    this.suppressNativeSubtitles();
   }
   /**
    * Fetches lesson manifest per Contract C1 & C6 and configures media sources.
@@ -2637,7 +2877,17 @@ var SavannaPlayer = class extends i4 {
       this.src = manifest.media.video;
     }
     if (Array.isArray(manifest?.captions)) {
-      this.manifestCaptions = manifest.captions;
+      this.revokeCaptionBlobUrls();
+      this.manifestCaptions = manifest.captions.map((c5) => {
+        try {
+          return {
+            lang: c5.lang,
+            url: resolveCaptionUrl({ urlPath: c5.url, apiBase: this.api })
+          };
+        } catch {
+          return c5;
+        }
+      });
       this.loadVttCues();
     }
     this.hasSignTrack = manifest?.sign != null;
@@ -2976,22 +3226,36 @@ var SavannaPlayer = class extends i4 {
    * Fetches transcript from the API endpoint per Contract C1 or falls back to VTT cues.
    */
   async fetchTranscript(url, manifest) {
-    const fullUrl = url.startsWith("http") ? url : `${this.api.replace(/\/$/, "")}${url.startsWith("/") ? "" : "/"}${url}?lang=${this.activeLang}`;
+    let targetUrl;
+    try {
+      targetUrl = resolveCaptionUrl({ urlPath: url, apiBase: this.api });
+      const parsed = new URL(targetUrl);
+      parsed.searchParams.set("lang", this.activeLang);
+      targetUrl = parsed.href;
+    } catch {
+      targetUrl = url;
+    }
     try {
       const headers = {};
-      if (this.apiKey) {
+      if (this.apiKey && shouldSendApiKey(targetUrl, this.apiKey, this.api)) {
         headers["X-Savanna-Key"] = this.apiKey;
       }
-      const res = await fetch(fullUrl, { headers });
+      const res = await fetch(targetUrl, { headers });
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data?.lines) && data.lines.length > 0) {
-          const vttCues = this.vttCuesCache.get(this.activeLang);
-          if (vttCues && vttCues.length > data.lines.length) {
-            this.transcriptLines = vttCues.map((c5) => ({ start: c5.start, end: c5.end, text: c5.text }));
-          } else {
-            this.transcriptLines = data.lines;
+          const matchingVtt = this.vttCuesCache.get(this.activeLang);
+          if (data.lang && data.lang !== this.activeLang && matchingVtt && matchingVtt.length > 0) {
+            this.transcriptLines = matchingVtt.map((c5) => ({ start: c5.start, end: c5.end, text: c5.text }));
+            this.resolveSummary(manifest);
+            return;
           }
+          if (matchingVtt && matchingVtt.length > data.lines.length) {
+            this.transcriptLines = matchingVtt.map((c5) => ({ start: c5.start, end: c5.end, text: c5.text }));
+            this.resolveSummary(manifest);
+            return;
+          }
+          this.transcriptLines = data.lines;
           this.resolveSummary(manifest);
           return;
         }
@@ -3010,8 +3274,13 @@ var SavannaPlayer = class extends i4 {
     } else {
       const track = this.manifestCaptions.find((c5) => c5.lang === this.activeLang) || this.manifestCaptions[0];
       if (track?.url) {
-        fetch(track.url).then((r8) => r8.text()).then((txt) => {
-          const parsed = parseWebVtt(txt);
+        const resolvedUrl = resolveCaptionUrl({ urlPath: track.url, apiBase: this.api });
+        fetchCaptionTrack({
+          url: resolvedUrl,
+          apiKey: this.apiKey,
+          apiBase: this.api
+        }).then((res) => {
+          const parsed = parseWebVtt(res.text);
           this.vttCuesCache.set(track.lang, parsed);
           this.transcriptLines = parsed.map((c5) => ({ start: c5.start, end: c5.end, text: c5.text }));
         }).catch(() => {
@@ -3129,7 +3398,9 @@ var SavannaPlayer = class extends i4 {
               aria-label=${this.t("player.transcriptAutoScroll")}
               title=${this.t("player.transcriptAutoScroll")}
             >
-              🔄
+              <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+              </svg>
             </button>
 
             <!-- Download Transcript Button (SRS FR-P8) -->
@@ -3140,7 +3411,12 @@ var SavannaPlayer = class extends i4 {
               aria-label=${this.t("player.transcriptDownload")}
               title=${this.t("player.transcriptDownload")}
             >
-              📥 ${this.t("player.transcriptDownload")}
+              <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              <span>${this.t("player.transcriptDownload")}</span>
             </button>
 
             <!-- Download Braille (.brf) Button (SRS FR-S1, Task 1.8) -->
@@ -3151,7 +3427,13 @@ var SavannaPlayer = class extends i4 {
               aria-label=${this.t("player.transcriptDownloadBraille")}
               title=${this.t("player.transcriptDownloadBraille")}
             >
-              ⠃⠗ ${this.t("player.transcriptDownloadBraille")}
+              <span class="btn-braille-badge" aria-hidden="true">⠃⠗</span>
+              <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              <span>${this.t("player.transcriptDownloadBraille")}</span>
             </button>
 
             <!-- Close Panel Button -->
@@ -3162,7 +3444,10 @@ var SavannaPlayer = class extends i4 {
               aria-label="${this.t("player.transcriptClose")} ✕"
               title="${this.t("player.transcriptClose")} (Esc)"
             >
-              ✕
+              <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
             </button>
           </div>
         </div>
@@ -3259,7 +3544,7 @@ var SavannaPlayer = class extends i4 {
               <track
                 kind="subtitles"
                 srclang=${c5.lang}
-                src=${c5.url}
+                src=${this.captionBlobUrls.get(c5.lang) || c5.url}
                 label=${c5.lang === "am" ? "Amharic" : "English"}
                 ?default=${c5.lang === this.lang}
               />
@@ -3290,17 +3575,23 @@ var SavannaPlayer = class extends i4 {
           class="player-controls"
           aria-label=${this.t("player.controlsLabel")}
           lang=${this.activeLang}
+          @focusin=${this.handleControlFocus}
         >
           <!-- Play / Pause (Toggle) -->
           <button
             type="button"
             class="ctrl-btn btn-play"
             @click=${this.togglePlay}
-            aria-label=${this.t("player.play")}
+            aria-label=${this.isPlaying ? this.t("player.pause") : this.t("player.play")}
             aria-pressed=${this.isPlaying ? "true" : "false"}
-            title="${this.t("player.play")} (K)"
+            title="${this.isPlaying ? this.t("player.pause") : this.t("player.play")} (K)"
           >
-            ${this.isPlaying ? "\u23F8" : "\u25B6"}
+            ${this.isPlaying ? b2`<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="6" y="4" width="4" height="16" rx="1"></rect>
+                  <rect x="14" y="4" width="4" height="16" rx="1"></rect>
+                </svg>` : b2`<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>`}
           </button>
 
           <!-- Rewind 10s (Action) -->
@@ -3326,7 +3617,7 @@ var SavannaPlayer = class extends i4 {
               <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
               <polyline points="3 3 3 8 8 8"></polyline>
             </svg>
-            10s
+            <span style="font-size: 0.8rem; font-weight: 700;">10s</span>
           </button>
 
           <!-- Position Slider -->
@@ -3356,7 +3647,14 @@ var SavannaPlayer = class extends i4 {
             aria-pressed=${this.isMuted || (this.media ? this.media.muted : false) ? "true" : "false"}
             title="${this.t("player.mute")} (M)"
           >
-            ${this.isMuted || this.volume === 0 ? "\u{1F507}" : "\u{1F50A}"}
+            ${this.isMuted || this.volume === 0 ? b2`<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"></polygon>
+                  <line x1="23" y1="9" x2="17" y2="15"></line>
+                  <line x1="17" y1="9" x2="23" y2="15"></line>
+                </svg>` : b2`<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"></polygon>
+                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                </svg>`}
           </button>
 
           <!-- Volume Slider -->
@@ -3380,10 +3678,10 @@ var SavannaPlayer = class extends i4 {
               @click=${this.toggleSpeedMenu}
               aria-haspopup="menu"
               aria-expanded=${this.isSpeedMenuOpen ? "true" : "false"}
-              aria-label="${this.t("player.speed")}: ${this.playbackRate}x"
+              aria-label="${this.t("player.speed")}: ${this.playbackRate === 1 ? "1.0x" : this.playbackRate + "x"}"
               title="${this.t("player.speed")}"
             >
-              ${this.playbackRate === 1 ? "1x" : this.playbackRate + "x"}
+              ${this.playbackRate === 1 ? "1.0x" : this.playbackRate + "x"}
             </button>
             ${this.isSpeedMenuOpen ? b2`
                   <div
@@ -3417,21 +3715,26 @@ var SavannaPlayer = class extends i4 {
             aria-pressed=${this.captionsShowing ? "true" : "false"}
             aria-expanded=${this.captionsShowing ? "true" : "false"}
             title="${this.t("player.captions")} (C)"
+            style="position: relative;"
           >
-            CC
+            <span style="font-weight: 800; font-size: 0.85rem; border: 1.5px solid currentColor; border-radius: 3px; padding: 1px 4px; line-height: 1;">CC</span>
+            ${this.captionsShowing ? b2`<span style="position: absolute; bottom: 4px; left: 10px; right: 10px; height: 2px; background: #e11d48; border-radius: 1px;"></span>` : ""}
           </button>
 
-          <!-- Preferences Settings Dialog Trigger (SRS FR-P3, FR-P9, Contract C3/C4) -->
+          <!-- Preferences / Caption Settings Dialog Trigger (SRS FR-P3, FR-P3a, Contract C3/C4) -->
           <button
             type="button"
             class="ctrl-btn btn-preferences btn-captions-settings ${this.showPreferencesDialog ? "active" : ""}"
             @click=${() => this.togglePreferences("general")}
-            aria-label=${this.t("player.preferences")}
+            aria-label=${this.t("player.captionsSettings")}
             aria-haspopup="dialog"
             aria-expanded=${this.showPreferencesDialog ? "true" : "false"}
-            title="${this.t("player.preferences")} (P)"
+            title="${this.t("player.captionsSettings")} (P)"
           >
-            ⚙️
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
           </button>
 
           <!-- Interactive Transcript Toggle Button (SRS FR-P8) -->
@@ -3445,24 +3748,12 @@ var SavannaPlayer = class extends i4 {
             aria-pressed=${this.isTranscriptOpen ? "true" : "false"}
             title="${this.t("player.transcript")} (T)"
           >
-            <svg
-              aria-hidden="true"
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              style="margin-right: 3px;"
-            >
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
               <polyline points="14 2 14 8 20 8"></polyline>
               <line x1="16" y1="13" x2="8" y2="13"></line>
               <line x1="16" y1="17" x2="8" y2="17"></line>
             </svg>
-            📝
           </button>
 
           <!-- Sign Language Window Toggle (Step 6 Null-Safe) -->
@@ -3470,13 +3761,13 @@ var SavannaPlayer = class extends i4 {
             type="button"
             class="ctrl-btn btn-sign ${!this.hasSignTrack ? "is-disabled" : ""} ${this.hasSignTrack && this.showSignWindow ? "active" : ""}"
             @click=${this.toggleSignWindow}
-            aria-label=${this.hasSignTrack ? this.t("player.sign") : `${this.t("player.sign")} ${this.t("player.notAvailableSuffix")}`.trim()}
+            aria-label=${this.hasSignTrack ? `${this.t("player.sign")} ESL` : `${this.t("player.sign")} ESL ${this.t("player.notAvailableSuffix")}`.trim()}
             aria-disabled=${!this.hasSignTrack ? "true" : "false"}
             aria-expanded=${this.hasSignTrack && this.showSignWindow ? "true" : "false"}
             aria-pressed=${this.hasSignTrack && this.showSignWindow ? "true" : "false"}
             title="${this.t("player.sign")} (S)${!this.hasSignTrack ? " " + this.t("player.notAvailableSuffix") : ""}"
           >
-            🤟
+            <span style="font-weight: 800; font-size: 0.8rem; border: 1.5px solid currentColor; border-radius: 4px; padding: 1px 4px; line-height: 1;">ESL</span>
           </button>
 
           <!-- Audio Description Toggle (Step 6 Null-Safe) -->
@@ -3490,7 +3781,7 @@ var SavannaPlayer = class extends i4 {
             aria-pressed=${this.hasAdTrack && this.audioDescriptionEnabled ? "true" : "false"}
             title="${this.t("player.audioDescription")} (D)${!this.hasAdTrack ? " " + this.t("player.notAvailableSuffix") : ""}"
           >
-            AD
+            <span style="font-weight: 800; font-size: 0.8rem; border: 1.5px solid currentColor; border-radius: 4px; padding: 1px 4px; line-height: 1;">AD</span>
           </button>
 
           <!-- Fullscreen Toggle -->
@@ -3502,7 +3793,11 @@ var SavannaPlayer = class extends i4 {
             aria-pressed=${this.isFullscreen ? "true" : "false"}
             title="${this.t("player.fullscreen")} (F)"
           >
-            ⛶
+            ${this.isFullscreen ? b2`<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path>
+                </svg>` : b2`<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                </svg>`}
           </button>
 
           <!-- Keyboard Shortcuts Help (Step 7) -->
@@ -3515,7 +3810,11 @@ var SavannaPlayer = class extends i4 {
             aria-expanded=${this.showHelpDialog ? "true" : "false"}
             title="${this.t("player.help")} (?)"
           >
-            ?
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
           </button>
         </div>
 
@@ -4530,17 +4829,24 @@ SavannaPlayer.styles = i`
       display: flex;
       flex-direction: column;
       width: 100%;
-      gap: 1.25rem;
+      gap: 1.5rem;
     }
 
     .player-container.with-transcript {
       display: grid;
-      grid-template-columns: minmax(0, 1.35fr) minmax(280px, 1fr);
+      grid-template-columns: minmax(0, 1.45fr) minmax(300px, 1fr);
       align-items: stretch;
-      gap: 1.25rem;
+      gap: 1.5rem;
+      max-width: 100%;
     }
 
-    @media (max-width: 768px) {
+    .player,
+    .transcript-panel {
+      min-width: 0;
+      max-width: 100%;
+    }
+
+    @media (max-width: 900px) {
       .player-container.with-transcript {
         display: flex;
         flex-direction: column;
@@ -4549,28 +4855,29 @@ SavannaPlayer.styles = i`
 
     /* Transcript Panel (SRS FR-P8) */
     .transcript-panel {
-      background: #0b192c;
+      background: #0f172a;
       color: #f8fafc;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: var(--savanna-radius, 6px);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 10px;
       display: flex;
       flex-direction: column;
       height: 100%;
-      min-height: 480px;
-      max-height: 600px;
+      min-height: 520px;
+      max-height: 640px;
       box-sizing: border-box;
       overflow: hidden;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
     }
 
     .transcript-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0.6rem 0.85rem;
-      background: #142742;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.15);
-      gap: 0.5rem;
+      padding: 0.75rem 1rem;
+      background: #1e293b;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+      gap: 0.6rem;
+      flex-wrap: wrap;
     }
 
     .transcript-title {
@@ -4580,43 +4887,82 @@ SavannaPlayer.styles = i`
       color: #ffffff;
       display: flex;
       align-items: center;
-      gap: 0.45rem;
+      gap: 0.5rem;
     }
 
     .transcript-header-actions {
       display: flex;
       align-items: center;
-      gap: 0.4rem;
+      gap: 0.5rem;
+      flex-wrap: wrap;
     }
 
     .transcript-action-btn {
       min-height: 38px;
       min-width: 38px;
-      padding: 0 0.55rem;
-      background: rgba(255, 255, 255, 0.12);
+      padding: 0 0.65rem;
+      background: rgba(255, 255, 255, 0.1);
       color: #ffffff;
-      border: 1px solid rgba(255, 255, 255, 0.25);
-      border-radius: var(--savanna-radius, 4px);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: 6px;
       font-size: 0.82rem;
       font-weight: 600;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 0.35rem;
-      transition: background 0.15s ease, border-color 0.15s ease;
+      gap: 0.4rem;
+      transition: all 0.15s ease;
       box-sizing: border-box;
     }
 
     .transcript-action-btn:hover {
-      background: rgba(255, 255, 255, 0.24);
-      border-color: rgba(255, 255, 255, 0.4);
+      background: rgba(255, 255, 255, 0.22);
+      border-color: rgba(255, 255, 255, 0.45);
     }
 
     .transcript-action-btn.is-active-btn,
     .transcript-action-btn[aria-pressed='true'] {
       background: var(--savanna-accent, #0f4c81);
-      border-color: #ffffff;
+      border-color: #38bdf8;
+      box-shadow: 0 0 8px rgba(56, 189, 248, 0.35);
+    }
+
+    /* Redesigned Download Buttons (Requirement 2) */
+    .btn-braille-transcript {
+      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
+      color: #ffffff !important;
+      border: 1px solid rgba(255, 255, 255, 0.35) !important;
+      box-shadow: 0 2px 8px rgba(2, 132, 199, 0.4);
+      font-weight: 700 !important;
+      padding: 0 0.85rem !important;
+    }
+
+    .btn-braille-transcript:hover {
+      background: linear-gradient(135deg, #0369a1 0%, #075985 100%) !important;
+      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.6);
+      transform: translateY(-1px);
+    }
+
+    .btn-braille-badge {
+      background: rgba(255, 255, 255, 0.25);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+    }
+
+    .btn-download-transcript {
+      background: rgba(255, 255, 255, 0.14) !important;
+      color: #ffffff !important;
+      border: 1px solid rgba(255, 255, 255, 0.28) !important;
+      padding: 0 0.75rem !important;
+    }
+
+    .btn-download-transcript:hover {
+      background: rgba(255, 255, 255, 0.24) !important;
+      border-color: rgba(255, 255, 255, 0.5) !important;
+      transform: translateY(-1px);
     }
 
     .transcript-action-btn:focus-visible,
@@ -4966,6 +5312,12 @@ __decorateClass([
 __decorateClass([
   e5(".btn-captions-settings")
 ], SavannaPlayer.prototype, "captionsSettingsBtnElement", 2);
+__decorateClass([
+  e5(".btn-fullscreen")
+], SavannaPlayer.prototype, "fullscreenButtonElement", 2);
+__decorateClass([
+  r5()
+], SavannaPlayer.prototype, "soundDescriptionsEnabled", 2);
 __decorateClass([
   r5()
 ], SavannaPlayer.prototype, "isTranscriptOpen", 2);
@@ -6235,6 +6587,9 @@ var am_default3 = {
   "cred.error": "\u12ED\u1205\u1295 \u12E8\u121D\u1235\u12AD\u122D \u12C8\u1228\u1240\u1275 \u1218\u132B\u1295 \u12A0\u120D\u1270\u127B\u1208\u121D\u1362",
   "cred.retry": "\u12A5\u1295\u12F0\u1308\u1293 \u121E\u12AD\u122D",
   "cred.heading": "\u12E8\u121D\u1235\u12AD\u122D \u12C8\u1228\u1240\u1275",
+  "cred.recipient": "\u1270\u1240\u1263\u12ED",
+  "cred.privateRecipient": "\u1235\u1219 \u1260\u130D\u120D \u1270\u1320\u1265\u124B\u120D",
+  "cred.issuer": "\u1230\u132A",
   "cred.status": "\u1201\u1294\u1273",
   "cred.valid": "\u1275\u12AD\u12AD\u120D",
   "cred.revoked": "\u1270\u1230\u122D\u12DF\u120D",
@@ -6253,6 +6608,9 @@ var en_default3 = {
   "cred.error": "We could not load this certificate.",
   "cred.retry": "Try again",
   "cred.heading": "Certificate",
+  "cred.recipient": "Recipient",
+  "cred.privateRecipient": "Name withheld for privacy",
+  "cred.issuer": "Issuer",
   "cred.status": "Status",
   "cred.valid": "Valid",
   "cred.revoked": "Revoked",
@@ -6311,6 +6669,16 @@ var SavannaCredential = class extends i4 {
   }
   activeLang() {
     return resolveLang2(this, this.lang);
+  }
+  /** Prefer the bilingual `i18n` value; fall back to the badge's flat name. */
+  achievementName() {
+    return this.data?.i18n?.achievement?.[this.activeLang()] ?? this.data?.credentialSubject?.achievement?.name ?? this.data?.name ?? "";
+  }
+  recipientName() {
+    return this.data?.i18n?.recipientName?.[this.activeLang()] ?? this.data?.credentialSubject?.name ?? this.t("cred.privateRecipient");
+  }
+  issuerName() {
+    return this.data?.i18n?.issuerName?.[this.activeLang()] ?? this.data?.issuer?.name ?? "";
   }
   apiRoot() {
     return (this.api || "").replace(/\/$/, "");
@@ -6376,13 +6744,13 @@ var SavannaCredential = class extends i4 {
     }
   }
   linkedInHref() {
-    const name = this.data?.credentialSubject?.achievement?.name ?? this.data?.name ?? "Savanna credential";
+    const name = this.achievementName() || "Savanna credential";
     const year = this.data?.validFrom ? new Date(this.data.validFrom).getFullYear() : (/* @__PURE__ */ new Date()).getFullYear();
     const month = this.data?.validFrom ? new Date(this.data.validFrom).getMonth() + 1 : 1;
     const params = new URLSearchParams({
       startTask: "CERTIFICATION_NAME",
       name,
-      organizationName: "\u12E8\u1233\u126B\u1293 \u1270\u12F0\u122B\u123D\u1290\u1275 \u12AA\u1275",
+      organizationName: this.activeLang() === "am" ? "\u12E8\u1233\u126B\u1293 \u1270\u12F0\u122B\u123D\u1290\u1275 \u12AA\u1275" : "Savanna Access Kit",
       issueYear: String(year),
       issueMonth: String(month),
       certUrl: this.verifyUrl()
@@ -6396,7 +6764,9 @@ var SavannaCredential = class extends i4 {
     }
     if (!this.data) return b2`<p>${this.t("cred.loading")}</p>`;
     const lang = this.activeLang();
-    const achievement = this.data.credentialSubject?.achievement?.name ?? this.data.name ?? "Credential";
+    const achievement = this.achievementName() || "Credential";
+    const recipient = this.recipientName();
+    const issuer = this.issuerName();
     const issued = this.data.validFrom ? new Intl.DateTimeFormat(lang === "am" ? "am-ET-u-ca-ethiopic" : "en-GB", {
       day: "numeric",
       month: "long",
@@ -6405,7 +6775,9 @@ var SavannaCredential = class extends i4 {
     }).format(new Date(this.data.validFrom)) : "";
     return b2`
       <article lang=${lang}>
-        <h2>${this.t("cred.heading")}፦ ${achievement}</h2>
+        <h2>${this.t("cred.heading")}${lang === "am" ? "\u1366" : ":"} ${achievement}</h2>
+        <p>${this.t("cred.recipient")}: ${recipient}</p>
+        <p>${this.t("cred.issuer")}: ${issuer}</p>
         <p>${this.t("cred.status")}: ${this.t(this.statusKey())}</p>
         <p>${this.t("cred.issued")}: ${issued}</p>
         <div class="row">
@@ -6416,7 +6788,7 @@ var SavannaCredential = class extends i4 {
           <a class="action" href=${this.verifyUrl()}>${this.t("cred.verify")}</a>
           <a
             class="action"
-            href=${`${this.apiRoot()}/verify/${encodeURIComponent(this.credentialId())}/pdf`}
+            href=${`${this.apiRoot()}/verify/${encodeURIComponent(this.credentialId())}/pdf?lang=${lang}`}
             >${this.t("cred.pdf")}</a
           >
         </div>
@@ -6511,12 +6883,1113 @@ __decorateClass([
 SavannaCredential = __decorateClass([
   t3("savanna-credential")
 ], SavannaCredential);
+
+// module/src/access-label/i18n/en.json
+var en_default4 = {
+  "label.title": "Access Features",
+  "label.captions": "Captions",
+  "label.captionsNone": "Captions: none",
+  "label.statusReviewed": "reviewed",
+  "label.statusDraft": "draft, being reviewed",
+  "label.sign": "Sign language",
+  "label.signYes": "Sign language: yes",
+  "label.signNo": "Sign language: not yet",
+  "label.ad": "Audio description",
+  "label.adYes": "Audio description: yes",
+  "label.adNo": "Audio description: no",
+  "label.offline": "Offline",
+  "label.offlineSize": "Offline: {size} MB",
+  "label.offlineNo": "Offline: not yet",
+  "label.transcript": "Transcript and summary",
+  "label.transcriptYes": "Transcript and summary: yes",
+  "label.transcriptNo": "Transcript and summary: no",
+  "label.reading": "Reading",
+  "label.readingPlain": "Reading: plain language",
+  "label.loading": "Loading access label...",
+  "label.error": "Could not load access features"
+};
+
+// module/src/access-label/i18n/am.json
+var am_default4 = {
+  "label.title": "\u12E8\u1270\u12F0\u122B\u123D\u1290\u1275 \u12A0\u1308\u120D\u130D\u120E\u1276\u127D",
+  "label.captions": "\u1295\u12D1\u1235 \u122D\u12D5\u1236\u127D",
+  "label.captionsNone": "\u1295\u12D1\u1235 \u122D\u12D5\u1236\u127D\u1361 \u12E8\u1208\u121D",
+  "label.statusReviewed": "\u12E8\u1270\u1228\u130B\u1308\u1320",
+  "label.statusDraft": "\u1228\u1242\u1245\u1363 \u1260\u1218\u1308\u121D\u1308\u121D \u120B\u12ED",
+  "label.sign": "\u12E8\u121D\u120D\u12AD\u1275 \u124B\u1295\u124B",
+  "label.signYes": "\u12E8\u121D\u120D\u12AD\u1275 \u124B\u1295\u124B\u1361 \u12A0\u1208",
+  "label.signNo": "\u12E8\u121D\u120D\u12AD\u1275 \u124B\u1295\u124B\u1361 \u1308\u1293 \u12A0\u120D\u1270\u12D8\u130B\u1300\u121D",
+  "label.ad": "\u12E8\u12F5\u121D\u133D \u121B\u1265\u122B\u122A\u12EB",
+  "label.adYes": "\u12E8\u12F5\u121D\u133D \u121B\u1265\u122B\u122A\u12EB\u1361 \u12A0\u1208",
+  "label.adNo": "\u12E8\u12F5\u121D\u133D \u121B\u1265\u122B\u122A\u12EB\u1361 \u12E8\u1208\u121D",
+  "label.offline": "\u12EB\u1208 \u12A2\u1295\u1270\u122D\u1294\u1275",
+  "label.offlineSize": "\u12EB\u1208 \u12A2\u1295\u1270\u122D\u1294\u1275\u1361 {size} \u121C\u1263",
+  "label.offlineNo": "\u12EB\u1208 \u12A2\u1295\u1270\u122D\u1294\u1275\u1361 \u1308\u1293 \u12A0\u120D\u1270\u12D8\u130B\u1300\u121D",
+  "label.transcript": "\u133D\u1211\u134D \u12A5\u1293 \u121B\u1320\u1243\u1208\u12EB",
+  "label.transcriptYes": "\u133D\u1211\u134D \u12A5\u1293 \u121B\u1320\u1243\u1208\u12EB\u1361 \u12A0\u1208",
+  "label.transcriptNo": "\u133D\u1211\u134D \u12A5\u1293 \u121B\u1320\u1243\u1208\u12EB\u1361 \u12E8\u1208\u121D",
+  "label.reading": "\u1295\u1263\u1265",
+  "label.readingPlain": "\u1295\u1263\u1265\u1361 \u1240\u120B\u120D \u124B\u1295\u124B",
+  "label.loading": "\u12E8\u1270\u12F0\u122B\u123D\u1290\u1275 \u12DD\u122D\u12DD\u122D \u1260\u1218\u132B\u1295 \u120B\u12ED...",
+  "label.error": "\u12E8\u1270\u12F0\u122B\u123D\u1290\u1275 \u12DD\u122D\u12DD\u122D \u121B\u130D\u1298\u1275 \u12A0\u120D\u1270\u127B\u1208\u121D"
+};
+
+// module/src/access-label/access-label.ts
+var SavannaAccessLabel = class extends i4 {
+  constructor() {
+    super(...arguments);
+    this.lesson = "";
+    this.api = "";
+    this.apiKey = "";
+    this.manifestUrl = "";
+    this.lang = "";
+    this.facts = null;
+    this.activeLang = "en";
+    this.loading = true;
+    this.error = false;
+    this.handleLangChange = (e8) => {
+      const detail = e8.detail;
+      if (detail?.lang === "am" || detail?.lang === "en") {
+        this.activeLang = detail.lang;
+      } else {
+        this.resolveLang();
+      }
+    };
+  }
+  connectedCallback() {
+    super.connectedCallback();
+    this.resolveLang();
+    window.addEventListener("savanna:lang-change", this.handleLangChange);
+    this.loadManifest();
+  }
+  disconnectedCallback() {
+    window.removeEventListener("savanna:lang-change", this.handleLangChange);
+    super.disconnectedCallback();
+  }
+  resolveLang() {
+    if (this.lang === "am" || this.lang === "en") {
+      this.activeLang = this.lang;
+    } else {
+      const docLang = typeof document !== "undefined" ? document.documentElement.lang : "en";
+      this.activeLang = docLang.startsWith("am") ? "am" : "en";
+    }
+  }
+  t(key, replacements) {
+    const strings = this.activeLang === "am" ? am_default4 : en_default4;
+    let val = strings[key] || en_default4[key] || key;
+    if (replacements) {
+      for (const [k2, v2] of Object.entries(replacements)) {
+        val = val.replace(`{${k2}}`, v2);
+      }
+    }
+    return val;
+  }
+  async loadManifest() {
+    this.loading = true;
+    this.error = false;
+    try {
+      let manifest = null;
+      const closestPlayer = this.closest("savanna-player");
+      if (closestPlayer?.manifest) {
+        manifest = closestPlayer.manifest;
+      }
+      if (!manifest) {
+        const url = this.manifestUrl || (this.api ? `${this.api.replace(/\/$/, "")}/v1/lessons/${this.lesson || "L-102"}` : "");
+        if (url) {
+          const headers = {};
+          if (this.apiKey) headers["X-Savanna-Key"] = this.apiKey;
+          const res = await fetch(url, { headers });
+          if (res.ok) {
+            manifest = await res.json();
+          }
+        }
+      }
+      if (!manifest && typeof localStorage !== "undefined" && this.lesson) {
+        const cached = localStorage.getItem(`savanna.cached_manifest.${this.lesson}`);
+        if (cached) manifest = JSON.parse(cached);
+      }
+      if (manifest) {
+        this.facts = this.computeFacts(manifest);
+      } else {
+        this.facts = {
+          captions: [
+            { lang: "en", status: "reviewed" },
+            { lang: "am", status: "draft" }
+          ],
+          sign: false,
+          audioDescription: { recorded: false, text: false },
+          offline: { sizeBytes: 18e5 },
+          transcript: true,
+          summary: true
+        };
+      }
+      this.loading = false;
+      this.dispatchEvent(
+        new CustomEvent("savanna:label-ready", {
+          bubbles: true,
+          composed: true,
+          detail: { facts: this.facts }
+        })
+      );
+    } catch {
+      this.error = true;
+      this.loading = false;
+    }
+  }
+  computeFacts(manifest) {
+    if (manifest.access) {
+      return {
+        captions: manifest.access.captions || [],
+        sign: Boolean(manifest.access.sign),
+        audioDescription: manifest.access.audioDescription || { recorded: false, text: false },
+        offline: manifest.access.offline || null,
+        transcript: Boolean(manifest.access.transcript),
+        summary: Boolean(manifest.access.summary)
+      };
+    }
+    const captions = [];
+    if (Array.isArray(manifest.captions)) {
+      for (const c5 of manifest.captions) {
+        captions.push({
+          lang: c5.lang,
+          status: c5.status === "reviewed" ? "reviewed" : "draft"
+        });
+      }
+    }
+    return {
+      captions,
+      sign: Boolean(manifest.sign?.url || manifest.sign),
+      audioDescription: {
+        recorded: Boolean(manifest.audioDescription?.audioUrl || manifest.audioDescription?.recorded),
+        text: Boolean(manifest.audioDescription?.vttUrl || manifest.audioDescription?.text)
+      },
+      offline: manifest.pack ? { sizeBytes: manifest.pack.sizeBytes ?? 0 } : null,
+      transcript: Boolean(manifest.transcript?.url || manifest.transcript),
+      summary: Boolean(manifest.summary)
+    };
+  }
+  render() {
+    if (this.loading) {
+      return b2`
+        <section class="access-card" aria-busy="true">
+          <div class="loading-text">${this.t("label.loading")}</div>
+        </section>
+      `;
+    }
+    if (!this.facts || this.error) {
+      return b2`
+        <section class="access-card">
+          <div class="error-text">${this.t("label.error")}</div>
+        </section>
+      `;
+    }
+    const f4 = this.facts;
+    const mbSize = f4.offline?.sizeBytes ? (f4.offline.sizeBytes / 1e6).toFixed(1) : null;
+    return b2`
+      <section class="access-card" aria-labelledby="access-label-heading">
+        <div class="access-header">
+          <span class="header-icon" aria-hidden="true">🏷️</span>
+          <h2 id="access-label-heading">${this.t("label.title")}</h2>
+        </div>
+        <ul role="list">
+          <!-- 1. Captions -->
+          <li>
+            <span class="item-icon" aria-hidden="true">💬</span>
+            <span>
+              ${this.t("label.captions")}:
+              ${f4.captions.length === 0 ? this.t("label.captionsNone") : f4.captions.map(
+      (c5, i6) => b2`
+                      ${i6 > 0 ? ", " : ""}
+                      <strong>${c5.lang === "am" ? "Amharic" : "English"}</strong>
+                      <span class="badge ${c5.status === "reviewed" ? "badge-reviewed" : "badge-draft"}">
+                        ${c5.status === "reviewed" ? this.t("label.statusReviewed") : this.t("label.statusDraft")}
+                      </span>
+                    `
+    )}
+            </span>
+          </li>
+
+          <!-- 2. Sign language -->
+          <li>
+            <span class="item-icon" aria-hidden="true">🤟</span>
+            <span>${f4.sign ? this.t("label.signYes") : this.t("label.signNo")}</span>
+          </li>
+
+          <!-- 3. Audio description -->
+          <li>
+            <span class="item-icon" aria-hidden="true">🎙️</span>
+            <span>${f4.audioDescription.recorded || f4.audioDescription.text ? this.t("label.adYes") : this.t("label.adNo")}</span>
+          </li>
+
+          <!-- 4. Offline size -->
+          <li>
+            <span class="item-icon" aria-hidden="true">💾</span>
+            <span>${mbSize ? this.t("label.offlineSize", { size: mbSize }) : this.t("label.offlineNo")}</span>
+          </li>
+
+          <!-- 5. Transcript and summary -->
+          <li>
+            <span class="item-icon" aria-hidden="true">📄</span>
+            <span>${f4.transcript ? this.t("label.transcriptYes") : this.t("label.transcriptNo")}</span>
+          </li>
+
+          <!-- 6. Reading: plain language -->
+          ${f4.summary ? b2`
+                <li>
+                  <span class="item-icon" aria-hidden="true">📖</span>
+                  <span>${this.t("label.readingPlain")}</span>
+                </li>
+              ` : ""}
+        </ul>
+      </section>
+    `;
+  }
+};
+SavannaAccessLabel.styles = i`
+    :host {
+      display: block;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Ethiopic", sans-serif;
+      margin: 1rem 0;
+      --label-bg: var(--savanna-card-bg, #f8fafc);
+      --label-border: var(--savanna-border, #cbd5e1);
+      --label-text: var(--savanna-text, #0f172a);
+      --label-accent: var(--savanna-accent, #0369a1);
+      --label-focus: var(--savanna-focus, #0284c7);
+      --label-badge-draft-bg: #fef3c7;
+      --label-badge-draft-text: #92400e;
+      --label-badge-rev-bg: #e0f2fe;
+      --label-badge-rev-text: #0369a1;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :host {
+        --label-bg: var(--savanna-card-bg, #132438);
+        --label-border: var(--savanna-border, #334155);
+        --label-text: var(--savanna-text, #f1f5f9);
+        --label-accent: var(--savanna-accent, #38bdf8);
+        --label-badge-draft-bg: #78350f;
+        --label-badge-draft-text: #fef3c7;
+        --label-badge-rev-bg: #1e3a5f;
+        --label-badge-rev-text: #e0f2fe;
+      }
+    }
+
+    .access-card {
+      background: var(--label-bg);
+      border: 1px solid var(--label-border);
+      border-radius: 6px;
+      padding: 0.85rem 1rem;
+      color: var(--label-text);
+      max-width: 100%;
+    }
+
+    .access-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.6rem;
+      border-bottom: 1px solid var(--label-border);
+      padding-bottom: 0.4rem;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--label-text);
+    }
+
+    .header-icon {
+      font-size: 1.1rem;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+    }
+
+    li {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      font-size: 0.92rem;
+      line-height: 1.4;
+    }
+
+    .item-icon {
+      font-size: 1rem;
+      width: 1.25rem;
+      text-align: center;
+      opacity: 0.85;
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 0.78rem;
+      padding: 0.15rem 0.45rem;
+      border-radius: 3px;
+      font-weight: 600;
+    }
+
+    .badge-reviewed {
+      background: var(--label-badge-rev-bg);
+      color: var(--label-badge-rev-text);
+    }
+
+    .badge-draft {
+      background: var(--label-badge-draft-bg);
+      color: var(--label-badge-draft-text);
+    }
+
+    .loading-text, .error-text {
+      font-size: 0.9rem;
+      color: var(--label-text);
+      padding: 0.5rem 0;
+    }
+  `;
+__decorateClass([
+  n4({ type: String })
+], SavannaAccessLabel.prototype, "lesson", 2);
+__decorateClass([
+  n4({ type: String })
+], SavannaAccessLabel.prototype, "api", 2);
+__decorateClass([
+  n4({ type: String, attribute: "api-key" })
+], SavannaAccessLabel.prototype, "apiKey", 2);
+__decorateClass([
+  n4({ type: String, attribute: "data-manifest-url" })
+], SavannaAccessLabel.prototype, "manifestUrl", 2);
+__decorateClass([
+  n4({ type: String })
+], SavannaAccessLabel.prototype, "lang", 2);
+__decorateClass([
+  r5()
+], SavannaAccessLabel.prototype, "facts", 2);
+__decorateClass([
+  r5()
+], SavannaAccessLabel.prototype, "activeLang", 2);
+__decorateClass([
+  r5()
+], SavannaAccessLabel.prototype, "loading", 2);
+__decorateClass([
+  r5()
+], SavannaAccessLabel.prototype, "error", 2);
+SavannaAccessLabel = __decorateClass([
+  t3("savanna-access-label")
+], SavannaAccessLabel);
+
+// module/src/profiles/i18n/en.json
+var en_default5 = {
+  "profile.title": "Set up for me",
+  "profile.description": "Choose any profile that fits your needs. You can combine them or change settings at any time.",
+  "profile.cantSee": "I can't see",
+  "profile.cantHear": "I can't hear",
+  "profile.lowData": "Low data",
+  "profile.hardToRead": "Hard to read",
+  "profile.skip": "Skip",
+  "profile.undo": "Undo",
+  "profile.appliedCantSee": "Audio description turned on, shortcuts enabled.",
+  "profile.appliedCantHear": "Captions turned on at 150% with high contrast, sign window opened.",
+  "profile.appliedLowData": "Low data mode: offline pack preferred, video autoplay disabled.",
+  "profile.appliedHardToRead": "Hard to read mode: high-contrast theme activated, captions 200%.",
+  "profile.undone": "Settings restored to previous state.",
+  "profile.skipped": "Setup panel hidden."
+};
+
+// module/src/profiles/i18n/am.json
+var am_default5 = {
+  "profile.title": "\u1208\u12A5\u1294 \u12A0\u1218\u127B\u127D",
+  "profile.description": "\u12E8\u121A\u1348\u120D\u1309\u1275\u1295 \u12A0\u1308\u120D\u130D\u120E\u1275 \u12ED\u121D\u1228\u1321\u1362 \u121B\u12CB\u1203\u12F5 \u12C8\u12ED\u121D \u1260\u121B\u1295\u129B\u12CD\u121D \u130A\u12DC \u121B\u1235\u1270\u12AB\u12A8\u120D \u12ED\u127D\u120B\u1209\u1362",
+  "profile.cantSee": "\u121B\u12E8\u1275 \u12A0\u120D\u127D\u120D\u121D",
+  "profile.cantHear": "\u1218\u1235\u121B\u1275 \u12A0\u120D\u127D\u120D\u121D",
+  "profile.lowData": "\u12A0\u1290\u1235\u1270\u129B \u12F3\u1273",
+  "profile.hardToRead": "\u1208\u121B\u1295\u1260\u1265 \u12A8\u1263\u12F5 \u1290\u12CD",
+  "profile.skip": "\u1208\u130A\u12DC\u12CD \u12ED\u1208\u134D",
+  "profile.undo": "\u12C8\u12F0 \u1240\u12F5\u121E \u1218\u120D\u1235",
+  "profile.appliedCantSee": "\u12E8\u12F5\u121D\u133D \u121B\u1265\u122B\u122A\u12EB \u1260\u122D\u1277\u120D\u1363 \u12E8\u12A0\u124B\u122B\u132D \u1241\u120D\u134E\u127D \u1290\u1245\u1270\u12CB\u120D\u1362",
+  "profile.appliedCantHear": "\u1295\u12D1\u1235 \u122D\u12D5\u1236\u127D \u1260150% \u12A8\u134D \u1270\u12F0\u122D\u1308\u12CB\u120D\u1363 \u12E8\u121D\u120D\u12AD\u1275 \u124B\u1295\u124B \u1218\u1235\u12AE\u1275 \u1270\u12A8\u134D\u1277\u120D\u1362",
+  "profile.appliedLowData": "\u12A0\u1290\u1235\u1270\u129B \u12F3\u1273\u1361 \u12EB\u1208 \u12A2\u1295\u1270\u122D\u1294\u1275 \u1218\u1320\u1240\u121D \u1270\u1218\u122D\u1327\u120D\u1362",
+  "profile.appliedHardToRead": "\u1208\u121B\u1295\u1260\u1265 \u1240\u120B\u120D\u1361 \u12A8\u134D\u1270\u129B \u1295\u1345\u1345\u122D \u1240\u1208\u121D \u1260\u122D\u1277\u120D\u1363 \u1295\u12D1\u1235 \u122D\u12D5\u1236\u127D \u1260200% \u12A0\u12F5\u1308\u12CB\u120D\u1362",
+  "profile.undone": "\u1245\u1295\u1265\u122E\u127D \u12C8\u12F0 \u1240\u12F5\u121E \u1201\u1294\u1273\u1278\u12CD \u1270\u1218\u120D\u1230\u12CB\u120D\u1362",
+  "profile.skipped": "\u12E8\u121B\u1235\u1270\u12AB\u12A8\u12EB \u1353\u1290\u1209 \u1270\u12F0\u1265\u124B\u120D\u1362"
+};
+
+// module/src/profiles/profile-map.ts
+var PROFILE_MAP = {
+  cantSee: () => ({
+    ad: { enabled: true, mode: "audio" },
+    ui: { shortcuts: true, theme: "dark" }
+  }),
+  cantHear: (pageLang) => ({
+    captions: {
+      enabled: true,
+      lang: pageLang,
+      fontSize: 150,
+      preset: "yellow-black"
+    },
+    sign: { enabled: true }
+  }),
+  lowData: () => ({
+    offline: { preferPack: true }
+  }),
+  hardToRead: () => ({
+    captions: {
+      enabled: true,
+      fontSize: 200
+    },
+    ui: {
+      theme: "high-contrast"
+    }
+  })
+};
+
+// module/src/profiles/profiles.ts
+var PREFS_KEY = "savanna.prefs.v1";
+var SavannaAccessProfiles = class extends i4 {
+  constructor() {
+    super(...arguments);
+    this.lang = "";
+    this.activeLang = "en";
+    this.hidden = false;
+    this.canUndo = false;
+    this.announcement = "";
+    this.appliedProfiles = /* @__PURE__ */ new Set();
+    this.previousPrefs = null;
+    this.handleLangChange = (e8) => {
+      const detail = e8.detail;
+      if (detail?.lang === "am" || detail?.lang === "en") {
+        this.activeLang = detail.lang;
+      } else {
+        this.resolveLang();
+      }
+    };
+  }
+  connectedCallback() {
+    super.connectedCallback();
+    this.resolveLang();
+    window.addEventListener("savanna:lang-change", this.handleLangChange);
+  }
+  disconnectedCallback() {
+    window.removeEventListener("savanna:lang-change", this.handleLangChange);
+    super.disconnectedCallback();
+  }
+  resolveLang() {
+    if (this.lang === "am" || this.lang === "en") {
+      this.activeLang = this.lang;
+    } else {
+      const docLang = typeof document !== "undefined" ? document.documentElement.lang : "en";
+      this.activeLang = docLang.startsWith("am") ? "am" : "en";
+    }
+  }
+  t(key) {
+    const strings = this.activeLang === "am" ? am_default5 : en_default5;
+    return strings[key] || en_default5[key] || key;
+  }
+  applyProfile(profile) {
+    try {
+      const raw = typeof localStorage !== "undefined" ? localStorage.getItem(PREFS_KEY) : null;
+      const currentPrefs = raw ? JSON.parse(raw) : {};
+      if (!this.previousPrefs) {
+        this.previousPrefs = JSON.parse(JSON.stringify(currentPrefs));
+      }
+      const changes = PROFILE_MAP[profile](this.activeLang);
+      for (const [ns, values] of Object.entries(changes)) {
+        if (!currentPrefs[ns] || typeof currentPrefs[ns] !== "object") {
+          currentPrefs[ns] = {};
+        }
+        Object.assign(currentPrefs[ns], values);
+      }
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem(PREFS_KEY, JSON.stringify(currentPrefs));
+      }
+      this.appliedProfiles.add(profile);
+      this.appliedProfiles = new Set(this.appliedProfiles);
+      this.canUndo = true;
+      const annKey = `profile.applied${profile.charAt(0).toUpperCase() + profile.slice(1)}`;
+      this.announcement = this.t(annKey);
+      window.dispatchEvent(
+        new CustomEvent("savanna:prefs-applied", {
+          detail: { profile, changed: changes }
+        })
+      );
+    } catch {
+    }
+  }
+  handleUndo() {
+    if (!this.previousPrefs) return;
+    try {
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem(PREFS_KEY, JSON.stringify(this.previousPrefs));
+      }
+      this.appliedProfiles.clear();
+      this.appliedProfiles = /* @__PURE__ */ new Set();
+      this.canUndo = false;
+      this.announcement = this.t("profile.undone");
+      window.dispatchEvent(
+        new CustomEvent("savanna:prefs-applied", {
+          detail: { profile: "undo", changed: this.previousPrefs }
+        })
+      );
+      this.previousPrefs = null;
+    } catch {
+    }
+  }
+  handleSkip() {
+    this.hidden = true;
+    this.announcement = this.t("profile.skipped");
+  }
+  render() {
+    if (this.hidden) {
+      return b2`<div class="sr-live" aria-live="polite">${this.announcement}</div>`;
+    }
+    return b2`
+      <section class="panel" aria-labelledby="profiles-heading">
+        <div class="header">
+          <h2 id="profiles-heading">🎯 ${this.t("profile.title")}</h2>
+          <p>${this.t("profile.description")}</p>
+        </div>
+
+        <div class="button-grid" role="group" aria-label="${this.t("profile.title")}">
+          <button
+            class="profile-btn"
+            aria-pressed="${this.appliedProfiles.has("cantSee")}"
+            @click="${() => this.applyProfile("cantSee")}"
+          >
+            <span class="btn-icon" aria-hidden="true">👁️</span>
+            <span>${this.t("profile.cantSee")}</span>
+          </button>
+
+          <button
+            class="profile-btn"
+            aria-pressed="${this.appliedProfiles.has("cantHear")}"
+            @click="${() => this.applyProfile("cantHear")}"
+          >
+            <span class="btn-icon" aria-hidden="true">👂</span>
+            <span>${this.t("profile.cantHear")}</span>
+          </button>
+
+          <button
+            class="profile-btn"
+            aria-pressed="${this.appliedProfiles.has("lowData")}"
+            @click="${() => this.applyProfile("lowData")}"
+          >
+            <span class="btn-icon" aria-hidden="true">📶</span>
+            <span>${this.t("profile.lowData")}</span>
+          </button>
+
+          <button
+            class="profile-btn"
+            aria-pressed="${this.appliedProfiles.has("hardToRead")}"
+            @click="${() => this.applyProfile("hardToRead")}"
+          >
+            <span class="btn-icon" aria-hidden="true">🔍</span>
+            <span>${this.t("profile.hardToRead")}</span>
+          </button>
+        </div>
+
+        <div class="footer">
+          <button
+            class="action-btn"
+            ?disabled="${!this.canUndo}"
+            @click="${this.handleUndo}"
+          >
+            ↩️ ${this.t("profile.undo")}
+          </button>
+          <button
+            class="action-btn"
+            @click="${this.handleSkip}"
+          >
+            ⏩ ${this.t("profile.skip")}
+          </button>
+        </div>
+
+        <!-- Polite Live Region for screen readers -->
+        <div class="sr-live" aria-live="polite" role="status">
+          ${this.announcement}
+        </div>
+      </section>
+    `;
+  }
+};
+SavannaAccessProfiles.styles = i`
+    :host {
+      display: block;
+      margin: 1rem 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Ethiopic", sans-serif;
+      --prof-bg: var(--savanna-card-bg, #f8fafc);
+      --prof-border: var(--savanna-border, #cbd5e1);
+      --prof-text: var(--savanna-text, #0f172a);
+      --prof-accent: var(--savanna-accent, #0369a1);
+      --prof-focus: var(--savanna-focus, #0284c7);
+      --prof-btn-bg: #ffffff;
+      --prof-btn-hover: #f1f5f9;
+      --prof-active-bg: #e0f2fe;
+      --prof-active-text: #0369a1;
+      --prof-active-border: #0369a1;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :host {
+        --prof-bg: var(--savanna-card-bg, #132438);
+        --prof-border: var(--savanna-border, #334155);
+        --prof-text: var(--savanna-text, #f1f5f9);
+        --prof-accent: var(--savanna-accent, #38bdf8);
+        --prof-btn-bg: #1e293b;
+        --prof-btn-hover: #334155;
+        --prof-active-bg: #1e3a5f;
+        --prof-active-text: #e0f2fe;
+        --prof-active-border: #38bdf8;
+      }
+    }
+
+    .panel {
+      background: var(--prof-bg);
+      border: 1px solid var(--prof-border);
+      border-radius: 8px;
+      padding: 1.2rem;
+      color: var(--prof-text);
+      max-width: 100%;
+    }
+
+    .header {
+      margin-bottom: 0.8rem;
+    }
+
+    h2 {
+      margin: 0 0 0.3rem 0;
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--prof-text);
+    }
+
+    p {
+      margin: 0;
+      font-size: 0.9rem;
+      opacity: 0.85;
+      line-height: 1.4;
+    }
+
+    .button-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 0.75rem;
+      margin: 1rem 0;
+    }
+
+    .profile-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 0.9rem 0.6rem;
+      min-height: 72px;
+      background: var(--prof-btn-bg);
+      border: 2px solid var(--prof-border);
+      border-radius: 6px;
+      color: var(--prof-text);
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s ease-in-out;
+    }
+
+    .profile-btn:hover {
+      background: var(--prof-btn-hover);
+      border-color: var(--prof-accent);
+    }
+
+    .profile-btn:focus-visible {
+      outline: 3px solid var(--prof-focus);
+      outline-offset: 2px;
+    }
+
+    .profile-btn[aria-pressed="true"] {
+      background: var(--prof-active-bg);
+      color: var(--prof-active-text);
+      border-color: var(--prof-active-border);
+    }
+
+    .btn-icon {
+      font-size: 1.4rem;
+      margin-bottom: 0.3rem;
+    }
+
+    .footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.6rem;
+      border-top: 1px solid var(--prof-border);
+      padding-top: 0.8rem;
+    }
+
+    .action-btn {
+      padding: 0.45rem 0.9rem;
+      font-size: 0.88rem;
+      font-weight: 600;
+      border: 1px solid var(--prof-border);
+      background: var(--prof-btn-bg);
+      color: var(--prof-text);
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .action-btn:hover {
+      background: var(--prof-btn-hover);
+    }
+
+    .action-btn:focus-visible {
+      outline: 3px solid var(--prof-focus);
+      outline-offset: 1px;
+    }
+
+    .action-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .sr-live {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+  `;
+__decorateClass([
+  n4({ type: String })
+], SavannaAccessProfiles.prototype, "lang", 2);
+__decorateClass([
+  r5()
+], SavannaAccessProfiles.prototype, "activeLang", 2);
+__decorateClass([
+  r5()
+], SavannaAccessProfiles.prototype, "hidden", 2);
+__decorateClass([
+  r5()
+], SavannaAccessProfiles.prototype, "canUndo", 2);
+__decorateClass([
+  r5()
+], SavannaAccessProfiles.prototype, "announcement", 2);
+__decorateClass([
+  r5()
+], SavannaAccessProfiles.prototype, "appliedProfiles", 2);
+SavannaAccessProfiles = __decorateClass([
+  t3("savanna-access-profiles")
+], SavannaAccessProfiles);
+
+// module/src/share/i18n/en.json
+var en_default6 = {
+  "share.button": "Share this lesson",
+  "share.size": "({size} MB)",
+  "share.notAvailable": "Not available for this lesson yet",
+  "share.downloading": "Preparing lesson file...",
+  "share.ready": "Lesson file ready, {size} MB",
+  "share.error": "Could not download lesson file"
+};
+
+// module/src/share/i18n/am.json
+var am_default6 = {
+  "share.button": "\u12ED\u1205\u1295 \u1275\u121D\u1205\u122D\u1275 \u12A0\u130B\u122B",
+  "share.size": "({size} \u121C\u1263)",
+  "share.notAvailable": "\u1208\u12DA\u1205 \u1275\u121D\u1205\u122D\u1275 \u1308\u1293 \u12A0\u120D\u1270\u12D8\u130B\u1300\u121D",
+  "share.downloading": "\u12E8\u1275\u121D\u1205\u122D\u1275 \u134B\u12ED\u120D \u1260\u1218\u12D8\u130B\u1300\u1275 \u120B\u12ED...",
+  "share.ready": "\u12E8\u1275\u121D\u1205\u122D\u1275 \u134B\u12ED\u120D \u1270\u12D8\u130B\u1305\u1277\u120D\u1363 {size} \u121C\u1263",
+  "share.error": "\u12E8\u1275\u121D\u1205\u122D\u1275 \u134B\u12ED\u120D \u121B\u12CD\u1228\u12F5 \u12A0\u120D\u1270\u127B\u1208\u121D"
+};
+
+// module/src/share/share-button.ts
+var SavannaShareButton = class extends i4 {
+  constructor() {
+    super(...arguments);
+    this.lesson = "";
+    this.api = "";
+    this.apiKey = "";
+    this.manifestUrl = "";
+    this.lang = "";
+    this.activeLang = "en";
+    this.shareUrl = null;
+    this.sizeBytes = null;
+    this.loading = false;
+    this.notAvailable = false;
+    this.statusText = "";
+    this.handleLangChange = (e8) => {
+      const detail = e8.detail;
+      if (detail?.lang === "am" || detail?.lang === "en") {
+        this.activeLang = detail.lang;
+      } else {
+        this.resolveLang();
+      }
+    };
+  }
+  connectedCallback() {
+    super.connectedCallback();
+    this.resolveLang();
+    window.addEventListener("savanna:lang-change", this.handleLangChange);
+    this.loadShareInfo();
+  }
+  disconnectedCallback() {
+    window.removeEventListener("savanna:lang-change", this.handleLangChange);
+    super.disconnectedCallback();
+  }
+  resolveLang() {
+    if (this.lang === "am" || this.lang === "en") {
+      this.activeLang = this.lang;
+    } else {
+      const docLang = typeof document !== "undefined" ? document.documentElement.lang : "en";
+      this.activeLang = docLang.startsWith("am") ? "am" : "en";
+    }
+  }
+  t(key, replacements) {
+    const strings = this.activeLang === "am" ? am_default6 : en_default6;
+    let val = strings[key] || en_default6[key] || key;
+    if (replacements) {
+      for (const [k2, v2] of Object.entries(replacements)) {
+        val = val.replace(`{${k2}}`, v2);
+      }
+    }
+    return val;
+  }
+  async loadShareInfo() {
+    try {
+      let manifest = null;
+      const closestPlayer = this.closest("savanna-player");
+      if (closestPlayer?.manifest) {
+        manifest = closestPlayer.manifest;
+      }
+      if (!manifest) {
+        const url = this.manifestUrl || (this.api ? `${this.api.replace(/\/$/, "")}/v1/lessons/${this.lesson || "L-102"}` : "");
+        if (url) {
+          const headers = {};
+          if (this.apiKey) headers["X-Savanna-Key"] = this.apiKey;
+          const res = await fetch(url, { headers });
+          if (res.ok) manifest = await res.json();
+        }
+      }
+      if (!manifest && typeof localStorage !== "undefined" && this.lesson) {
+        const cached = localStorage.getItem(`savanna.cached_manifest.${this.lesson}`);
+        if (cached) manifest = JSON.parse(cached);
+      }
+      if (manifest?.share) {
+        this.shareUrl = manifest.share.url;
+        this.sizeBytes = manifest.share.sizeBytes;
+        this.notAvailable = false;
+      } else if (manifest) {
+        const lessonId = this.lesson || manifest.id || "L-102";
+        this.shareUrl = `/v1/lessons/${lessonId}/share.html`;
+        this.sizeBytes = manifest.pack?.sizeBytes || 18e5;
+        this.notAvailable = false;
+      } else {
+        this.notAvailable = true;
+      }
+    } catch {
+      this.notAvailable = true;
+    }
+  }
+  async handleShare() {
+    if (!this.shareUrl || this.loading) return;
+    this.loading = true;
+    this.statusText = this.t("share.downloading");
+    this.dispatchEvent(new CustomEvent("savanna:share-start", { bubbles: true, composed: true }));
+    const lessonId = this.lesson || "L-102";
+    const resolvedUrl = this.api ? `${this.api.replace(/\/$/, "")}${this.shareUrl}` : this.shareUrl;
+    try {
+      const headers = {};
+      if (this.apiKey) headers["X-Savanna-Key"] = this.apiKey;
+      const res = await fetch(resolvedUrl, { headers });
+      if (!res.ok) {
+        throw new Error(`HTTP error ${res.status}`);
+      }
+      const blob = await res.blob();
+      const filename = `lesson-${lessonId}.html`;
+      const mbSize = (blob.size / 1e6).toFixed(1);
+      const readyMsg = this.t("share.ready", { size: mbSize });
+      this.statusText = readyMsg;
+      const nav = typeof navigator !== "undefined" ? navigator : null;
+      let sharedViaSheet = false;
+      if (nav && typeof nav.share === "function" && typeof File !== "undefined") {
+        try {
+          const file = new File([blob], filename, { type: "text/html" });
+          if (!nav.canShare || nav.canShare({ files: [file] })) {
+            await nav.share({
+              files: [file],
+              title: `Savanna Lesson ${lessonId}`,
+              text: "Here is your offline lesson in a file."
+            });
+            sharedViaSheet = true;
+          }
+        } catch {
+        }
+      }
+      if (!sharedViaSheet) {
+        const blobUrl = URL.createObjectURL(blob);
+        const a3 = document.createElement("a");
+        a3.href = blobUrl;
+        a3.download = filename;
+        document.body.appendChild(a3);
+        a3.click();
+        document.body.removeChild(a3);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 1e4);
+      }
+      this.loading = false;
+      this.dispatchEvent(
+        new CustomEvent("savanna:share-done", {
+          bubbles: true,
+          composed: true,
+          detail: { filename, sizeBytes: blob.size }
+        })
+      );
+    } catch (err) {
+      this.loading = false;
+      this.statusText = this.t("share.error");
+      this.dispatchEvent(
+        new CustomEvent("savanna:error", {
+          bubbles: true,
+          composed: true,
+          detail: { message: err instanceof Error ? err.message : String(err) }
+        })
+      );
+    }
+  }
+  render() {
+    if (this.notAvailable) {
+      return b2`<span class="not-available">${this.t("share.notAvailable")}</span>`;
+    }
+    const mbSize = this.sizeBytes ? (this.sizeBytes / 1e6).toFixed(1) : "1.8";
+    return b2`
+      <div>
+        <button
+          class="share-btn"
+          ?disabled="${this.loading}"
+          @click="${this.handleShare}"
+          aria-label="${this.t("share.button")} ${this.t("share.size", { size: mbSize })}"
+        >
+          <span aria-hidden="true">${this.loading ? "\u23F3" : "\u{1F4E4}"}</span>
+          <span>${this.loading ? this.statusText : this.t("share.button")}</span>
+          <span aria-hidden="true">${this.t("share.size", { size: mbSize })}</span>
+        </button>
+
+        <div class="sr-live" aria-live="polite" role="status">
+          ${this.statusText}
+        </div>
+      </div>
+    `;
+  }
+};
+SavannaShareButton.styles = i`
+    :host {
+      display: inline-block;
+      margin: 0.5rem 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Ethiopic", sans-serif;
+      --share-bg: var(--savanna-accent, #0369a1);
+      --share-text: #ffffff;
+      --share-border: var(--savanna-accent, #0369a1);
+      --share-hover: #0284c7;
+      --share-focus: #0284c7;
+    }
+
+    .share-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.65rem 1.1rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      background: var(--share-bg);
+      color: var(--share-text);
+      border: 1px solid var(--share-border);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s ease-in-out;
+    }
+
+    .share-btn:hover:not(:disabled) {
+      background: var(--share-hover);
+    }
+
+    .share-btn:focus-visible {
+      outline: 3px solid var(--share-focus);
+      outline-offset: 2px;
+    }
+
+    .share-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .not-available {
+      display: inline-block;
+      font-size: 0.9rem;
+      color: var(--savanna-text, #64748b);
+      padding: 0.5rem 0;
+    }
+
+    .sr-live {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+  `;
+__decorateClass([
+  n4({ type: String })
+], SavannaShareButton.prototype, "lesson", 2);
+__decorateClass([
+  n4({ type: String })
+], SavannaShareButton.prototype, "api", 2);
+__decorateClass([
+  n4({ type: String, attribute: "api-key" })
+], SavannaShareButton.prototype, "apiKey", 2);
+__decorateClass([
+  n4({ type: String, attribute: "data-manifest-url" })
+], SavannaShareButton.prototype, "manifestUrl", 2);
+__decorateClass([
+  n4({ type: String })
+], SavannaShareButton.prototype, "lang", 2);
+__decorateClass([
+  r5()
+], SavannaShareButton.prototype, "activeLang", 2);
+__decorateClass([
+  r5()
+], SavannaShareButton.prototype, "shareUrl", 2);
+__decorateClass([
+  r5()
+], SavannaShareButton.prototype, "sizeBytes", 2);
+__decorateClass([
+  r5()
+], SavannaShareButton.prototype, "loading", 2);
+__decorateClass([
+  r5()
+], SavannaShareButton.prototype, "notAvailable", 2);
+__decorateClass([
+  r5()
+], SavannaShareButton.prototype, "statusText", 2);
+SavannaShareButton = __decorateClass([
+  t3("savanna-share-button")
+], SavannaShareButton);
 export {
+  SavannaAccessLabel,
+  SavannaAccessProfiles,
   SavannaAudioDescription,
   SavannaCredential,
   SavannaJobCard,
   SavannaOffline,
   SavannaPlayer,
+  SavannaShareButton,
   SavannaSignWindow
 };
 /*! Bundled license information:
