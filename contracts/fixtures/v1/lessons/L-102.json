@@ -4,7 +4,7 @@
     "en": "Introduction to databases",
     "am": "የመረጃ ቋት መግቢያ"
   },
-  "durationSec": 12,
+  "durationSec": 120,
   "media": {
     "video": "http://localhost:4010/media/lesson.mp4",
     "audio": "http://localhost:4010/media/lesson.opus"
