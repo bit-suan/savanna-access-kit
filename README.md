@@ -3,6 +3,12 @@
 **Track 2: Accessible Learning Media + Career Gateway**  
 *ALX Accessibility Hackathon 2026*
 
+**Live demo:** [https://YOUR-APP.vercel.app ](https://savanna-access-kit.onrender.com/) 
+**API docs:** [https://YOUR-API.onrender.com](https://savanna-access-kit.onrender.com/docs)  
+**Demo video:** [https://youtu.be/YOUR_VIDEO_ID](https://drive.google.com/file/d/12bQ7HxxnMq4dv40FXNutQ9AY13sXFkba/view?usp=sharing)  
+
+> The API runs on a free tier and may take up to a minute to wake up on first load.
+
 **Team Members:**
 - **Ruth Areda** (@Ruthareda) — *Member 1: Player Experience*
 - **Ekram Tofik** (@EkramTofik) — *Member 2: Media Access*
