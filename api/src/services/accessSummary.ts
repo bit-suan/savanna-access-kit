@@ -52,7 +52,10 @@ export function accessSummary(lesson?: AccessInput | null): AccessSummary {
     for (const lang of ["en", "am"] as const) {
       const match = lesson.captions.find((c) => c.lang === lang);
       if (match) {
-        const fromAccess = lesson.access?.captions?.find((ac) => ac.lang === lang);
+        const fromAccess =
+          "access" in lesson && lesson.access?.captions
+            ? lesson.access.captions.find((ac) => ac.lang === lang)
+            : undefined;
         const status =
           (match as any).status === "reviewed" || fromAccess?.status === "reviewed"
             ? "reviewed"
@@ -105,9 +108,9 @@ export function accessSummary(lesson?: AccessInput | null): AccessSummary {
 
   // 6. Reading / Summary: yes or no
   let summary = false;
-  if (lesson.access?.summary !== undefined) {
+  if ("access" in lesson && lesson.access && lesson.access.summary !== undefined) {
     summary = Boolean(lesson.access.summary);
-  } else if ((lesson as any).summary !== undefined) {
+  } else if ("summary" in lesson && (lesson as any).summary !== undefined) {
     summary = Boolean((lesson as any).summary);
   } else if ("assets" in lesson && Array.isArray(lesson.assets)) {
     summary = lesson.assets.some((a) => a.meta?.summary || a.kind === "transcript_html");
