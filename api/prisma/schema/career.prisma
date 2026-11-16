@@ -23,6 +23,7 @@ model Credential {
   issuedAt      DateTime
   status        String // valid | revoked | expired
   proof         Json?
+  i18n          Json?
   validFrom     DateTime
   expiresAt     DateTime?
   recipientName String?

@@ -4,6 +4,14 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>የሳቫና የሥራ መግቢያ ማሳያ</title>
+    <script>
+      // Apply the saved language before the components upgrade (defaults to Amharic).
+      try {
+        if (localStorage.getItem("savanna.lang") === "en") {
+          document.documentElement.lang = "en";
+        }
+      } catch (e) {}
+    </script>
     <style>
       body {
         margin: 0;
@@ -31,6 +39,17 @@
         font: inherit;
         margin-right: 0.5rem;
       }
+      .lang-switch {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+      }
+      .lang-switch button[aria-pressed="true"] {
+        background: #111;
+        color: #fff;
+        border-color: #111;
+      }
       savanna-job-card,
       savanna-credential {
         display: block;
@@ -44,22 +63,20 @@
   </head>
   <body>
     <header>
-      <h1>የሳቫና የሥራ መግቢያ ማሳያ</h1>
+      <h1 data-i18n="title">የሳቫና የሥራ መግቢያ ማሳያ</h1>
+      <div class="lang-switch" role="group" aria-label="ቋንቋ / Language">
+        <button type="button" data-lang="am" lang="am" aria-pressed="true">አማርኛ</button>
+        <button type="button" data-lang="en" lang="en" aria-pressed="false">English</button>
+      </div>
     </header>
     <main>
-      <h2>የሥራ ዕድል</h2>
-      <savanna-job-card
-        job="J-9"
-        api="http://localhost:4020"
-        api-key="pk_live_demo"
-        lang="am"
-      ></savanna-job-card>
-      <h2>የምስክር ወረቀት</h2>
+      <h2 data-i18n="jobsHeading">የሥራ ዕድል</h2>
+      <savanna-job-card job="J-9" api="http://localhost:4020" api-key="pk_live_demo"></savanna-job-card>
+      <h2 data-i18n="credentialHeading">የምስክር ወረቀት</h2>
       <savanna-credential
         id="C-7"
         api="http://localhost:4020"
         api-key="pk_live_demo"
-        lang="am"
       ></savanna-credential>
     </main>
     <script type="module" src="/src/main.ts"></script>

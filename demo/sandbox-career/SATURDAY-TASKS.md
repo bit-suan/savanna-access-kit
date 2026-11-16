@@ -41,6 +41,9 @@ attributes.
 - [ ] At 320 CSS px, check job cards and controls have no horizontal page scroll.
 - [ ] At 200% and 400% browser zoom, confirm facts reflow into one column and controls
       remain visible and reachable.
+- [ ] Switch the main and no-build demos between English and Amharic. Confirm job facts,
+      employment type, audio transcript, credential details and apply link follow the
+      chosen language after reload.
 - [ ] With keyboard only, reach Play, start audio, stop audio, open/close the transcript,
       then reach Apply. Confirm visible focus throughout.
 - [ ] With NVDA and a browser, navigate the card by headings and definition-list facts.
@@ -70,6 +73,10 @@ automated duration test after replacing assets.
       characters (128 random bits).
 - [ ] Open its verify page on a phone-sized viewport. Check the status, achievement,
       recipient, issuer, QR code and copy-link action.
+- [ ] Open `/verify/{id}?lang=en` and `/verify/{id}?lang=am`; confirm the selected
+      language is retained by the copied URL and the PDF download link.
+- [ ] Open `/apply/J-9?lang=en` and `/apply/J-9?lang=am`; confirm labels, errors and
+      success feedback follow the selected language.
 - [ ] Use TalkBack or NVDA to confirm the QR code has an accessible name and the status
       and copy result are announced.
 - [ ] Revoke the credential, refresh the page, and confirm `Revoked` is immediately
@@ -84,6 +91,8 @@ automated duration test after replacing assets.
 
 - [ ] Download the PDF from the credential component and confirm it opens and includes
       the achievement, recipient, status and verification URL.
+- [ ] Download both `/verify/{id}/pdf?lang=en` and `?lang=am`; confirm language and
+      Ethiopic calendar formatting are correct.
 - [ ] Run PAC 2024 and veraPDF in PDF/UA-1 mode. Record tool versions and results; check
       the reading order and tags with NVDA. Do not claim PDF/UA conformance until these
       checks pass.

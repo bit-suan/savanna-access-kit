@@ -20,10 +20,28 @@
         display: block;
         margin-block: 1rem;
       }
+      nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+      nav button {
+        min-width: 44px;
+        min-height: 44px;
+        font: inherit;
+      }
+      :focus-visible {
+        outline: 3px solid #0b5cab;
+        outline-offset: 3px;
+      }
     </style>
   </head>
   <body>
-    <h1>የሥራ ዕድሎች</h1>
+    <nav aria-label="ቋንቋ / Language">
+      <button type="button" data-lang="am" lang="am" aria-pressed="true">አማርኛ</button>
+      <button type="button" data-lang="en" lang="en" aria-pressed="false">English</button>
+    </nav>
+    <h1 data-am="የሥራ ዕድሎች" data-en="Job opportunities">የሥራ ዕድሎች</h1>
     <savanna-job-card
       job="J-9"
       api="http://localhost:4020"
@@ -37,7 +55,20 @@
       lang="am"
     ></savanna-credential>
     <script type="module">
-      await import(`/dist/savanna-career.v1.js?build=${Date.now()}`);
+      await import(/* @vite-ignore */ `/dist/savanna-career.v1.js?build=${Date.now()}`);
+      const buttons = [...document.querySelectorAll("[data-lang]")];
+      const components = [...document.querySelectorAll("savanna-job-card, savanna-credential")];
+      document.querySelector("nav")?.addEventListener("click", (event) => {
+        const button = event.target.closest("button[data-lang]");
+        if (!button) return;
+        const lang = button.dataset.lang;
+        document.documentElement.lang = lang;
+        document.querySelector("h1").textContent = document.querySelector("h1").dataset[lang];
+        document.title = lang === "am" ? "የሥራ ዕድሎች የአጋር ገጽ" : "Partner job opportunities";
+        buttons.forEach((item) => item.setAttribute("aria-pressed", String(item === button)));
+        components.forEach((element) => element.setAttribute("lang", lang));
+        window.dispatchEvent(new CustomEvent("savanna:lang-change", { detail: { lang } }));
+      });
     </script>
   </body>
 </html>

@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Caption editor: Savanna Access Kit pipeline</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #fbf8f1; --card: #ffffff; --ink: #1d1b16; --muted: #5a564b; --line: #c9c2b0;
+    --accent: #0b4f6c; --on-accent: #ffffff; --focus: #003f5c;
+    --err: #a4161a; --err-bg: #fdecec; --warn: #7a4b00; --warn-bg: #fff4dc; --ok: #1d6b35;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #15140f; --card: #1f1d17; --ink: #f1ede2; --muted: #b9b3a3; --line: #4a463a;
+      --accent: #8fd0ea; --on-accent: #06222e; --focus: #ffd24d;
+      --err: #ff9c9f; --err-bg: #3a1618; --warn: #ffcf7a; --warn-bg: #35280c; --ok: #8fdc9f;
+    }
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html { font-size: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink); line-height: 1.55;
+    font-family: system-ui, "Noto Sans Ethiopic", "Nyala", "Abyssinica SIL", sans-serif;
+  }
+  .wrap { max-width: 56rem; margin-inline: auto; padding: 1rem; }
+  h1, h2 { font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif; line-height: 1.2; }
+  h1 { font-size: 1.9rem; margin: .5rem 0 .25rem; }
+  h2 { font-size: 1.3rem; margin: 0 0 .5rem; }
+  h3 { font-size: 1.05rem; margin: 0 0 .5rem; }
+  p { margin: .4rem 0; max-width: 70ch; }
+  .muted { color: var(--muted); }
+  .skip { position: absolute; inset-inline-start: -999px; }
+  .skip:focus { position: static; display: inline-block; padding: .5rem 1rem; }
+  .panel {
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 1rem; margin-block: 1rem;
+  }
+  label { display: block; font-weight: 600; margin: .6rem 0 .25rem; }
+  input, textarea, select, button { font: inherit; color: inherit; }
+  input[type="text"], input:not([type]), textarea, select {
+    width: 100%; min-height: 44px; padding: .5rem .7rem;
+    background: var(--bg); border: 2px solid var(--line); border-radius: 6px;
+  }
+  input[type="file"] { width: 100%; min-height: 44px; padding: .5rem 0; }
+  textarea { resize: vertical; }
+  textarea:lang(am) { line-height: 1.7; }
+  .time { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; }
+  [aria-invalid="true"] { border-color: var(--err); }
+  :focus-visible {
+    outline: 3px solid var(--focus); outline-offset: 2px;
+    box-shadow: 0 0 0 6px var(--bg);
+  }
+  .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: .25rem 1rem; }
+  .times { display: grid; grid-template-columns: repeat(auto-fit, minmax(11.5rem, 1fr)); gap: 0 1rem; }
+  .btn {
+    min-height: 44px; min-width: 44px; padding: .5rem 1rem; cursor: pointer;
+    background: transparent; color: var(--accent); border: 2px solid var(--accent); border-radius: 6px;
+  }
+  .btn.primary { background: var(--accent); color: var(--on-accent); }
+  .btn:disabled { opacity: .55; cursor: not-allowed; }
+  .btn.danger { color: var(--err); border-color: var(--err); }
+  .actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .75rem; }
+  ol.cues { list-style: none; margin: 0; padding: 0; display: grid; gap: 1rem; }
+  .cue {
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    border-inline-start-width: 6px; padding: 1rem;
+  }
+  .cue.has-error { border-inline-start-color: var(--err); }
+  .cue.has-warn { border-inline-start-color: var(--warn); }
+  .count { color: var(--muted); font-size: .9rem; margin: .25rem 0 0; }
+  .msgs { list-style: none; margin: .4rem 0 0; padding: 0; }
+  .msgs li { padding: .3rem .6rem; border-radius: 6px; margin-top: .25rem; }
+  .msgs li.error { background: var(--err-bg); color: var(--err); }
+  .msgs li.warning { background: var(--warn-bg); color: var(--warn); }
+  .verdict { font-weight: 700; }
+  .verdict.ok { color: var(--ok); }
+  .verdict.bad { color: var(--err); }
+  details { margin-top: .5rem; }
+  summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 600; }
+  #problems { padding-inline-start: 1.25rem; }
+  #problems li { margin: .25rem 0; }
+  code, pre {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: .9rem;
+    overflow-wrap: anywhere;
+  }
+  pre { white-space: pre-wrap; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: .6rem .8rem; }
+  audio { width: 100%; margin-top: .5rem; }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+  @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+</head>
+<body>
+<a class="skip" href="#cues-h">Skip to the cues</a>
+<div class="wrap">
+  <header>
+    <h1>Caption editor</h1>
+    <p>A person corrects the draft captions here: the words and the times. Then you save the file and approve it with the pipeline review step.</p>
+    <p class="muted">Nothing is uploaded. The file stays in your browser. Everything works with the keyboard.</p>
+  </header>
+
+  <main>
+    <section class="panel" aria-labelledby="open-h">
+      <h2 id="open-h">1. Open a caption file</h2>
+      <div class="row">
+        <div>
+          <label for="vtt-file">Caption file (.vtt or .srt)</label>
+          <input id="vtt-file" type="file" accept=".vtt,.srt,text/vtt">
+        </div>
+        <div>
+          <label for="lang">Caption language</label>
+          <select id="lang">
+            <option value="en">English (en)</option>
+            <option value="am">Amharic (am)</option>
+          </select>
+        </div>
+      </div>
+      <p id="open-msg" class="muted">Open the draft the pipeline made, for example <code>pipeline-out/L-102/captions/en.draft.vtt</code>.</p>
+      <p><button type="button" class="btn" id="add-first-top">Or start a new empty file</button></p>
+
+      <h3>Optional: listen while you correct</h3>
+      <label for="media-file">Lesson audio or video file</label>
+      <input id="media-file" type="file" accept="audio/*,video/*">
+      <p class="muted">The player plays the sound only. When it is loaded, each cue gets buttons to play it and to copy the player time into its start or end.</p>
+      <audio id="media" controls preload="metadata" hidden aria-label="Lesson audio"></audio>
+    </section>
+
+    <section class="panel" aria-labelledby="check-h">
+      <h2 id="check-h">2. Check and save</h2>
+      <p id="summary" tabindex="-1">No cues yet.</p>
+      <details id="problem-box" hidden>
+        <summary id="problem-summary">Problems</summary>
+        <ul id="problems"></ul>
+      </details>
+      <div class="actions">
+        <button type="button" class="btn" id="check-all">Check all cues</button>
+        <button type="button" class="btn primary" id="download">Download VTT file</button>
+      </div>
+      <p id="save-msg" class="muted"></p>
+      <label for="lesson-id">Lesson ID (only used to show the commands below)</label>
+      <input id="lesson-id" type="text" value="L-102" autocomplete="off" spellcheck="false">
+      <p>Save the file here, replacing the draft:</p>
+      <pre id="save-path"></pre>
+      <p>Then approve it (the review step refuses files with errors):</p>
+      <pre id="save-cmd"></pre>
+    </section>
+
+    <section aria-labelledby="cues-h">
+      <h2 id="cues-h">3. Cues</h2>
+      <p class="muted">Limits come from the pipeline: at most 2 lines, about 32 characters per line, 1 to 7 seconds on screen. Errors must be fixed. Warnings are advice.</p>
+      <p>Listen for sounds that carry meaning, such as music or a door closing. Add them as their own cue, for example <code>[music]</code>.</p>
+      <p id="empty" hidden>
+        There are no cues. <button type="button" class="btn" id="add-first">Add the first cue</button>
+      </p>
+      <ol class="cues" id="cues"></ol>
+    </section>
+  </main>
+</div>
+<div id="live" class="sr-only" role="status" aria-live="polite"></div>
+
+<script>
+/* CORE:START (pure functions, no DOM) */
+const Core = (() => {
+  const LIMITS = { maxLines: 2, maxLineChars: 32, minDur: 1, maxDur: 7 };
+  const TIME_RE = /^\s*(?:(\d+):)?(\d{1,2}):(\d{2})[.,](\d{1,3})\s*$/;
+  const pad = (n, w = 2) => String(n).padStart(w, "0");
+
+  function parseTime(s) {
+    const m = TIME_RE.exec(String(s));
+    if (!m) return null;
+    const hasHours = m[1] !== undefined;
+    if (Number(m[3]) > 59 || (hasHours && Number(m[2]) > 59)) return null;
+    const ms = Number(m[4].padEnd(3, "0"));
+    return Number(m[1] || 0) * 3600 + Number(m[2]) * 60 + Number(m[3]) + ms / 1000;
+  }
+
+  function fmtTime(seconds) {
+    const ms = Math.max(0, Math.round(seconds * 1000));
+    const h = Math.floor(ms / 3600000);
+    const m = Math.floor((ms % 3600000) / 60000);
+    const s = Math.floor((ms % 60000) / 1000);
+    return `${pad(h)}:${pad(m)}:${pad(s)}.${pad(ms % 1000, 3)}`;
+  }
+
+  const stripTags = (s) => s.replace(/<[^>]*>/g, "");
+  const unescapeText = (s) =>
+    s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&lrm;|&rlm;/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&");
+  const escapeText = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  /** Tolerant reader for WebVTT (and SRT). Returns plain {start, end, text} cues with time strings. */
+  function parseVtt(input) {
+    const notes = [];
+    let text = String(input).replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
+    if (!/^WEBVTT(?:[ \t\n]|$)/.test(text)) text = "WEBVTT\n\n" + text;
+    const blocks = text.split(/\n{2,}/).map((b) => b.replace(/^\n+|\n+$/g, "")).filter(Boolean);
+    const lm = /^Language:[ \t]*(\S+)/m.exec(blocks[0] || "");
+    const lang = lm ? lm[1].toLowerCase() : null;
+    const cues = [];
+    let stripped = false;
+    for (const block of blocks.slice(1)) {
+      const lines = block.split("\n");
+      if (/^(NOTE|STYLE|REGION)(?:[ \t]|$)/.test(lines[0])) continue;
+      const at = lines.findIndex((l) => l.includes("-->"));
+      if (at < 0) { notes.push(`Skipped text without a timing line: "${lines[0].slice(0, 40)}".`); continue; }
+      const [a, b = ""] = lines[at].split("-->");
+      const startRaw = a.trim();
+      const endRaw = (b.trim().split(/\s+/)[0]) || "";
+      const sp = parseTime(startRaw), ep = parseTime(endRaw);
+      const payload = lines.slice(at + 1);
+      if (payload.some((l) => /<[^>]*>/.test(l))) stripped = true;
+      cues.push({
+        start: sp === null ? startRaw : fmtTime(sp),
+        end: ep === null ? endRaw : fmtTime(ep),
+        text: payload.map((l) => unescapeText(stripTags(l)).replace(/\s+$/, "")).filter((l) => l.trim() !== "").join("\n"),
+      });
+    }
+    if (stripped) notes.push("Formatting tags were removed. Captions are plain text.");
+    return { cues, lang, notes };
+  }
+
+  const textLines = (t) => t.split("\n").map((l) => l.trim()).filter((l) => l !== "");
+
+  /** Same layout as the pipeline's own writer, so the review step reads it exactly like its own drafts. */
+  function toVtt(cues, lang) {
+    const head = ["WEBVTT", "Kind: captions", `Language: ${lang}`, ""];
+    const body = cues.map((c, i) => {
+      const sp = parseTime(c.start), ep = parseTime(c.end);
+      return [
+        String(i + 1),
+        `${sp === null ? c.start.trim() : fmtTime(sp)} --> ${ep === null ? c.end.trim() : fmtTime(ep)}`,
+        ...textLines(c.text).map(escapeText),
+      ].join("\n");
+    });
+    return head.join("\n") + "\n" + body.join("\n\n") + "\n";
+  }
+
+  /** Same limits as the pipeline's checkCues. Returns [{sev, field, msg}]. */
+  function checkCue(cues, i, mediaDuration) {
+    const c = cues[i];
+    const out = [];
+    const add = (sev, field, msg) => out.push({ sev, field, msg });
+    const s = parseTime(c.start), e = parseTime(c.end);
+    if (s === null) add("error", "start", "The start time must look like 00:01:23.450.");
+    if (e === null) add("error", "end", "The end time must look like 00:01:25.900.");
+    if (s !== null && e !== null) {
+      if (e <= s) add("error", "end", "The end time must be after the start time.");
+      else {
+        const d = e - s;
+        if (d < LIMITS.minDur - 0.001) add("warning", "end", `On screen for ${d.toFixed(1)} s. Aim for at least ${LIMITS.minDur} s.`);
+        if (d > LIMITS.maxDur + 0.001) add("warning", "end", `On screen for ${d.toFixed(1)} s. Aim for at most ${LIMITS.maxDur} s.`);
+      }
+      if (i > 0) {
+        const ps = parseTime(cues[i - 1].end);
+        if (ps !== null && s < ps - 0.001) add("error", "start", `This cue starts before cue ${i} ends.`);
+      }
+      if (mediaDuration !== null && e > mediaDuration + 0.25) add("warning", "end", "This cue ends after the end of the loaded audio.");
+    }
+    const lines = textLines(c.text);
+    if (lines.length === 0) add("error", "text", "This cue has no text.");
+    if (lines.length > LIMITS.maxLines) add("error", "text", `This cue has ${lines.length} lines. The maximum is ${LIMITS.maxLines}.`);
+    lines.forEach((l, k) => {
+      const n = [...l].length;
+      if (n > LIMITS.maxLineChars) add("warning", "text", `Line ${k + 1} has ${n} characters. Aim for ${LIMITS.maxLineChars} or fewer.`);
+    });
+    return out;
+  }
+
+  return { LIMITS, parseTime, fmtTime, parseVtt, toVtt, checkCue, textLines };
+})();
+/* CORE:END */
+
+(() => {
+  "use strict";
+  const { LIMITS, parseTime, fmtTime, parseVtt, toVtt, checkCue, textLines } = Core;
+  const $ = (sel) => document.querySelector(sel);
+  const listEl = $("#cues"), emptyEl = $("#empty"), liveEl = $("#live"), media = $("#media");
+  const state = { cues: [], nextId: 1, dirty: false, mediaDuration: null, mediaReady: false, stopAt: null };
+
+  const say = (msg) => { liveEl.textContent = ""; window.setTimeout(() => { liveEl.textContent = msg; }, 60); };
+  const newCue = (start = "", end = "", text = "") => ({ id: state.nextId++, start, end, text });
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+  function buildCard(c, i) {
+    const n = i + 1, id = c.id, lang = $("#lang").value;
+    const li = document.createElement("li");
+    li.className = "cue";
+    li.dataset.id = String(id);
+    li.innerHTML = `
+      <h3 id="h-${id}" tabindex="-1">Cue ${n}</h3>
+      <div class="times">
+        <div><label for="s-${id}">Start time</label>
+          <input id="s-${id}" class="time" data-f="start" inputmode="decimal" autocomplete="off" spellcheck="false" aria-describedby="m-${id}"></div>
+        <div><label for="e-${id}">End time</label>
+          <input id="e-${id}" class="time" data-f="end" inputmode="decimal" autocomplete="off" spellcheck="false" aria-describedby="m-${id}"></div>
+      </div>
+      <label for="t-${id}">Caption text (at most ${LIMITS.maxLines} lines)</label>
+      <textarea id="t-${id}" data-f="text" rows="2" dir="auto" lang="${lang}" aria-describedby="n-${id} m-${id}"></textarea>
+      <p class="count" id="n-${id}"></p>
+      <ul class="msgs" id="m-${id}"></ul>
+      <div class="actions">
+        <button type="button" class="btn" data-act="play" data-needs-media aria-label="Play cue ${n}">Play cue</button>
+        <button type="button" class="btn" data-act="setstart" data-needs-media aria-label="Set start to player time, cue ${n}">Set start to player time</button>
+        <button type="button" class="btn" data-act="setend" data-needs-media aria-label="Set end to player time, cue ${n}">Set end to player time</button>
+        <button type="button" class="btn" data-act="add" aria-label="Add a cue after this one, cue ${n}">Add a cue after this one</button>
+        <button type="button" class="btn danger" data-act="del" aria-label="Delete this cue, cue ${n}">Delete this cue</button>
+      </div>`;
+    li.querySelector(`#s-${id}`).value = c.start;
+    li.querySelector(`#e-${id}`).value = c.end;
+    li.querySelector(`#t-${id}`).value = c.text;
+    li.querySelectorAll("[data-needs-media]").forEach((b) => { b.disabled = !state.mediaReady; });
+    return li;
+  }
+
+  function refresh() {
+    let errors = 0, warnings = 0;
+    const problems = [];
+    state.cues.forEach((c, i) => {
+      const li = listEl.children[i];
+      if (!li) return;
+      const issues = checkCue(state.cues, i, state.mediaDuration);
+      const msgs = li.querySelector(".msgs");
+      msgs.textContent = "";
+      const bad = { start: false, end: false, text: false };
+      issues.forEach((is) => {
+        if (is.sev === "error") { errors++; bad[is.field] = true; } else warnings++;
+        const m = document.createElement("li");
+        m.className = is.sev;
+        m.textContent = (is.sev === "error" ? "Error: " : "Warning: ") + is.msg;
+        msgs.appendChild(m);
+        problems.push({ id: c.id, n: i + 1, sev: is.sev, msg: is.msg });
+      });
+      li.querySelector(`#s-${c.id}`).setAttribute("aria-invalid", String(bad.start));
+      li.querySelector(`#e-${c.id}`).setAttribute("aria-invalid", String(bad.end));
+      li.querySelector(`#t-${c.id}`).setAttribute("aria-invalid", String(bad.text));
+      const hasErr = issues.some((x) => x.sev === "error");
+      li.classList.toggle("has-error", hasErr);
+      li.classList.toggle("has-warn", !hasErr && issues.length > 0);
+      const lines = textLines(c.text);
+      const longest = Math.max(0, ...lines.map((l) => [...l].length));
+      const s = parseTime(c.start), e = parseTime(c.end);
+      const dur = s !== null && e !== null && e > s ? ` On screen for ${(e - s).toFixed(1)} s.` : "";
+      li.querySelector(`#n-${c.id}`).textContent =
+        `${plural(lines.length, "line", "lines")}. Longest line: ${longest} of ${LIMITS.maxLineChars} characters.${dur}`;
+    });
+
+    const summary = $("#summary");
+    if (state.cues.length === 0) {
+      summary.textContent = "No cues yet.";
+    } else {
+      summary.textContent = "";
+      summary.append(`${plural(state.cues.length, "cue", "cues")}. ${plural(errors, "error", "errors")}. ${plural(warnings, "warning", "warnings")}. `);
+      const v = document.createElement("span");
+      v.className = "verdict " + (errors ? "bad" : "ok");
+      v.textContent = errors ? "Fix the errors before you approve." : "No errors. You can save and approve.";
+      summary.appendChild(v);
+    }
+    const box = $("#problem-box"), ul = $("#problems");
+    ul.textContent = "";
+    box.hidden = problems.length === 0;
+    $("#problem-summary").textContent = `Problems (${problems.length})`;
+    problems.forEach((p) => {
+      const li = document.createElement("li");
+      const a = document.createElement("a");
+      a.href = `#h-${p.id}`;
+      a.textContent = `Cue ${p.n}`;
+      li.append(a, `: ${p.sev === "error" ? "Error" : "Warning"}. ${p.msg}`);
+      ul.appendChild(li);
+    });
+    state.errors = errors;
+    state.warnings = warnings;
+  }
+
+  function render(focus) {
+    listEl.textContent = "";
+    state.cues.forEach((c, i) => listEl.appendChild(buildCard(c, i)));
+    emptyEl.hidden = state.cues.length > 0;
+    refresh();
+    if (focus) {
+      const el = document.getElementById(`${focus.field}-${focus.id}`);
+      if (el) el.focus();
+    }
+  }
+
+  function updateHelp() {
+    const lesson = ($("#lesson-id").value.trim() || "L-102").replace(/[^A-Za-z0-9._-]/g, "");
+    const lang = $("#lang").value;
+    $("#save-path").textContent = `pipeline-out/${lesson}/captions/${lang}.draft.vtt`;
+    $("#save-cmd").textContent = `pnpm pipeline review approve --lesson ${lesson} --lang ${lang} --by "Your name"`;
+  }
+
+  function startEmpty() {
+    const c = newCue("00:00:00.000", "00:00:02.000", "");
+    state.cues = [c];
+    state.dirty = true;
+    render({ id: c.id, field: "t" });
+    say("Started a new file with one empty cue.");
+  }
+
+  /* ---- open a file ---- */
+  $("#vtt-file").addEventListener("change", async (ev) => {
+    const file = ev.target.files && ev.target.files[0];
+    if (!file) return;
+    try {
+      const parsed = parseVtt(await file.text());
+      const msg = $("#open-msg");
+      if (parsed.cues.length === 0) {
+        msg.textContent = `No cues were found in ${file.name}. Check that it is a WebVTT or SRT caption file.`;
+        say(msg.textContent);
+        return;
+      }
+      if (parsed.lang === "en" || parsed.lang === "am") $("#lang").value = parsed.lang;
+      state.cues = parsed.cues.map((c) => newCue(c.start, c.end, c.text));
+      state.dirty = false;
+      updateHelp();
+      render();
+      msg.textContent = `Opened ${file.name}: ${plural(state.cues.length, "cue", "cues")}.` + (parsed.notes.length ? " " + parsed.notes.join(" ") : "");
+      say(msg.textContent + ` ${plural(state.errors, "error", "errors")}, ${plural(state.warnings, "warning", "warnings")}.`);
+    } catch (err) {
+      $("#open-msg").textContent = "This file could not be read.";
+      say("This file could not be read.");
+    }
+  });
+
+  $("#lang").addEventListener("change", () => {
+    const lang = $("#lang").value;
+    listEl.querySelectorAll("textarea").forEach((t) => t.setAttribute("lang", lang));
+    updateHelp();
+    state.dirty = true;
+  });
+  $("#lesson-id").addEventListener("input", updateHelp);
+  $("#add-first").addEventListener("click", startEmpty);
+  $("#add-first-top").addEventListener("click", startEmpty);
+
+  /* ---- edit cues ---- */
+  const cueOf = (el) => {
+    const li = el.closest(".cue");
+    if (!li) return null;
+    const id = Number(li.dataset.id);
+    const i = state.cues.findIndex((c) => c.id === id);
+    return i < 0 ? null : { i, c: state.cues[i] };
+  };
+
+  listEl.addEventListener("input", (ev) => {
+    const f = ev.target.dataset && ev.target.dataset.f;
+    const hit = f && cueOf(ev.target);
+    if (!hit) return;
+    hit.c[f] = ev.target.value;
+    state.dirty = true;
+    refresh();
+  });
+
+  listEl.addEventListener("focusout", (ev) => {
+    if (!ev.target.classList || !ev.target.classList.contains("time")) return;
+    const hit = cueOf(ev.target);
+    const v = parseTime(ev.target.value);
+    if (hit && v !== null) {
+      const clean = fmtTime(v);
+      if (clean !== ev.target.value) {
+        ev.target.value = clean;
+        hit.c[ev.target.dataset.f] = clean;
+        refresh();
+      }
+    }
+  });
+
+  listEl.addEventListener("click", (ev) => {
+    const btn = ev.target.closest("button[data-act]");
+    const hit = btn && cueOf(btn);
+    if (!hit) return;
+    const { i, c } = hit;
+    const act = btn.dataset.act;
+    if (act === "play") {
+      const s = parseTime(c.start), e = parseTime(c.end);
+      if (s === null) { say("Fix the start time first."); return; }
+      media.currentTime = s;
+      state.stopAt = e;
+      media.play().catch(() => say("The player could not start."));
+    } else if (act === "setstart" || act === "setend") {
+      const field = act === "setstart" ? "start" : "end";
+      c[field] = fmtTime(media.currentTime);
+      document.getElementById(`${field === "start" ? "s" : "e"}-${c.id}`).value = c[field];
+      state.dirty = true;
+      refresh();
+      say(`Cue ${i + 1} ${field} set to ${c[field]}.`);
+    } else if (act === "add") {
+      const end = parseTime(c.end);
+      const nc = newCue(end === null ? "" : fmtTime(end), end === null ? "" : fmtTime(end + 2), "");
+      state.cues.splice(i + 1, 0, nc);
+      state.dirty = true;
+      render({ id: nc.id, field: "t" });
+      say(`Cue ${i + 2} added after cue ${i + 1}. The cues after it moved down one number.`);
+    } else if (act === "del") {
+      if (!window.confirm(`Delete cue ${i + 1}? This cannot be undone.`)) return;
+      state.cues.splice(i, 1);
+      state.dirty = true;
+      const next = state.cues[Math.min(i, state.cues.length - 1)];
+      render();
+      if (next) {
+        const h = document.getElementById(`h-${next.id}`);
+        if (h) h.focus();
+      } else {
+        $("#add-first").focus();
+      }
+      say(`Cue ${i + 1} deleted. ${plural(state.cues.length, "cue", "cues")} left.`);
+    }
+  });
+
+  /* ---- listen while correcting ---- */
+  $("#media-file").addEventListener("change", (ev) => {
+    const file = ev.target.files && ev.target.files[0];
+    if (!file) return;
+    if (media.dataset.url) URL.revokeObjectURL(media.dataset.url);
+    const url = URL.createObjectURL(file);
+    media.dataset.url = url;
+    media.src = url;
+    media.hidden = false;
+    state.mediaReady = false;
+    state.mediaDuration = null;
+  });
+  media.addEventListener("loadedmetadata", () => {
+    state.mediaReady = true;
+    state.mediaDuration = Number.isFinite(media.duration) ? media.duration : null;
+    listEl.querySelectorAll("[data-needs-media]").forEach((b) => { b.disabled = false; });
+    refresh();
+    say("Audio loaded. The play and set-time buttons are now on.");
+  });
+  media.addEventListener("error", () => say("This audio or video file could not be played."));
+  media.addEventListener("timeupdate", () => {
+    if (state.stopAt !== null && media.currentTime >= state.stopAt) { state.stopAt = null; media.pause(); }
+  });
+  media.addEventListener("pause", () => { state.stopAt = null; });
+
+  /* ---- check and save ---- */
+  $("#check-all").addEventListener("click", () => {
+    refresh();
+    say(`${plural(state.cues.length, "cue", "cues")}. ${plural(state.errors, "error", "errors")}. ${plural(state.warnings, "warning", "warnings")}.`);
+    $("#summary").focus();
+  });
+
+  $("#download").addEventListener("click", () => {
+    if (state.cues.length === 0) { say("There is nothing to save yet."); $("#save-msg").textContent = "There is nothing to save yet."; return; }
+    refresh();
+    const lang = $("#lang").value;
+    const blob = new Blob([toVtt(state.cues, lang)], { type: "text/vtt;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${lang}.draft.vtt`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    state.dirty = false;
+    const msg = `Downloaded ${lang}.draft.vtt with ${plural(state.errors, "error", "errors")} and ${plural(state.warnings, "warning", "warnings")}.` +
+      (state.errors ? " The review step will refuse it until the errors are fixed." : " Now copy it into the folder shown below.");
+    $("#save-msg").textContent = msg;
+    say(msg);
+  });
+
+  window.addEventListener("beforeunload", (ev) => {
+    if (state.dirty) { ev.preventDefault(); ev.returnValue = ""; }
+  });
+
+  updateHelp();
+  render();
+})();
+</script>
+</body>
+</html>

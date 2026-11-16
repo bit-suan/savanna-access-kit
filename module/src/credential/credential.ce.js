@@ -3,6 +3,9 @@ const en = {
   "cred.error": "We could not load this certificate.",
   "cred.retry": "Try again",
   "cred.heading": "Certificate",
+  "cred.recipient": "Recipient",
+  "cred.privateRecipient": "Name withheld for privacy",
+  "cred.issuer": "Issuer",
   "cred.status": "Status",
   "cred.valid": "Valid",
   "cred.revoked": "Revoked",
@@ -19,6 +22,9 @@ const am = {
   "cred.error": "ይህን የምስክር ወረቀት መጫን አልተቻለም።",
   "cred.retry": "እንደገና ሞክር",
   "cred.heading": "የምስክር ወረቀት",
+  "cred.recipient": "ተቀባይ",
+  "cred.privateRecipient": "ስሙ በግል ተጠብቋል",
+  "cred.issuer": "ሰጪ",
   "cred.status": "ሁኔታ",
   "cred.valid": "ትክክል",
   "cred.revoked": "ተሰርዟል",
@@ -63,12 +69,13 @@ function esc(value) {
 
 class SavannaCredential extends HTMLElement {
   static get observedAttributes() {
-    return ["credential", "api", "api-key", "lang"];
+    return ["credential", "api", "api-key", "lang", "id"];
   }
 
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
+    this._request = null;
   }
 
   connectedCallback() {
@@ -78,10 +85,16 @@ class SavannaCredential extends HTMLElement {
 
   disconnectedCallback() {
     window.removeEventListener("savanna:lang-change", this._onLang);
+    this._request?.abort();
   }
 
   attributeChangedCallback(name) {
-    if (this.isConnected && name !== "id") this._load();
+    if (!this.isConnected) return;
+    if (name === "lang" && this._data) {
+      this._render();
+      return;
+    }
+    this._load();
   }
 
   _onLang = (ev) => {
@@ -97,10 +110,13 @@ class SavannaCredential extends HTMLElement {
   }
 
   _verify() {
-    return `${this._root()}/verify/${encodeURIComponent(this._cid())}`;
+    return `${this._root()}/verify/${encodeURIComponent(this._cid())}?lang=${langOf(this)}`;
   }
 
   async _load() {
+    this._request?.abort();
+    const request = new AbortController();
+    this._request = request;
     const id = this._cid();
     if (!id) return;
     this.shadowRoot.innerHTML = `<style>${css}</style><p>${t(this, "cred.loading")}</p>`;
@@ -110,21 +126,47 @@ class SavannaCredential extends HTMLElement {
           "X-Savanna-Key": this.getAttribute("api-key") || "",
           Accept: "application/ld+json",
         },
+        signal: request.signal,
       });
       if (!res.ok) throw new Error("bad");
       this._data = await res.json();
       this._render();
+      this.dispatchEvent(
+        new CustomEvent("savanna:ready", {
+          bubbles: true,
+          composed: true,
+          detail: { credential: id },
+        }),
+      );
     } catch {
+      if (request.signal.aborted) return;
       this.shadowRoot.innerHTML = `<style>${css}</style><p>${t(this, "cred.error")}</p>
         <button type="button" class="retry">${t(this, "cred.retry")}</button>`;
       this.shadowRoot.querySelector(".retry")?.addEventListener("click", () => this._load());
+      this.dispatchEvent(
+        new CustomEvent("savanna:error", {
+          bubbles: true,
+          composed: true,
+          detail: { credential: id, message: "Unable to load credential" },
+        }),
+      );
     }
   }
 
   _render() {
     const lang = langOf(this);
     const data = this._data;
-    const achievement = data.credentialSubject?.achievement?.name || data.name || "Credential";
+    const achievement =
+      data.i18n?.achievement?.[lang] ??
+      data.credentialSubject?.achievement?.name ??
+      data.name ??
+      "Credential";
+    const recipient =
+      data.i18n?.recipientName?.[lang] ??
+      data.credentialSubject?.name ??
+      t(this, "cred.privateRecipient");
+    const issuer =
+      data.i18n?.issuerName?.[lang] ?? data.issuer?.name ?? "";
     const status = data.credentialStatus?.status || "valid";
     const statusKey =
       status === "revoked" ? "cred.revoked" : status === "expired" ? "cred.expired" : "cred.valid";
@@ -141,21 +183,23 @@ class SavannaCredential extends HTMLElement {
     const linkedin = `https://www.linkedin.com/profile/add?${new URLSearchParams({
       startTask: "CERTIFICATION_NAME",
       name: achievement,
-      organizationName: "የሳቫና ተደራሽነት ኪት",
+      organizationName: lang === "am" ? "የሳቫና ተደራሽነት ኪት" : "Savanna Access Kit",
       issueYear: String(year),
       issueMonth: String(month),
       certUrl: this._verify(),
     })}`;
     this.shadowRoot.innerHTML = `<style>${css}</style>
       <article lang="${lang}">
-        <h2>${t(this, "cred.heading")}፦ ${esc(achievement)}</h2>
+        <h2>${t(this, "cred.heading")}${lang === "am" ? "፦" : ":"} ${esc(achievement)}</h2>
+        <p>${t(this, "cred.recipient")}: ${esc(recipient)}</p>
+        <p>${t(this, "cred.issuer")}: ${esc(issuer)}</p>
         <p>${t(this, "cred.status")}: ${t(this, statusKey)}</p>
         <p>${t(this, "cred.issued")}: ${esc(issued)}</p>
         <div class="row">
           <button type="button" class="copy">${t(this, "cred.copy")}</button>
           <a class="action" href="${esc(linkedin)}" rel="noopener noreferrer" target="_blank">${t(this, "cred.linkedin")}</a>
           <a class="action" href="${esc(this._verify())}">${t(this, "cred.verify")}</a>
-          <a class="action" href="${esc(`${this._root()}/verify/${encodeURIComponent(this._cid())}/pdf`)}">${t(this, "cred.pdf")}</a>
+          <a class="action" href="${esc(`${this._root()}/verify/${encodeURIComponent(this._cid())}/pdf?lang=${lang}`)}">${t(this, "cred.pdf")}</a>
         </div>
         <p class="live" role="status" aria-live="polite"></p>
       </article>`;

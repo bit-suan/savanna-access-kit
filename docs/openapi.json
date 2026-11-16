@@ -913,6 +913,49 @@
                     "type": "string",
                     "format": "date-time",
                     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  },
+                  "i18n": {
+                    "type": "object",
+                    "properties": {
+                      "achievement": {
+                        "type": "object",
+                        "properties": {
+                          "en": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200
+                          },
+                          "am": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200
+                          }
+                        },
+                        "required": [
+                          "en",
+                          "am"
+                        ]
+                      },
+                      "recipientName": {
+                        "type": "object",
+                        "properties": {
+                          "en": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200
+                          },
+                          "am": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200
+                          }
+                        },
+                        "required": [
+                          "en",
+                          "am"
+                        ]
+                      }
+                    }
                   }
                 },
                 "required": [
@@ -1051,6 +1094,60 @@
                         "achievement"
                       ],
                       "additionalProperties": {}
+                    },
+                    "i18n": {
+                      "type": "object",
+                      "properties": {
+                        "achievement": {
+                          "type": "object",
+                          "properties": {
+                            "en": {
+                              "type": "string"
+                            },
+                            "am": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "en",
+                            "am"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "recipientName": {
+                          "type": "object",
+                          "properties": {
+                            "en": {
+                              "type": "string"
+                            },
+                            "am": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "en",
+                            "am"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "issuerName": {
+                          "type": "object",
+                          "properties": {
+                            "en": {
+                              "type": "string"
+                            },
+                            "am": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "en",
+                            "am"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "additionalProperties": false
                     },
                     "proof": {
                       "type": "object",
@@ -1280,6 +1377,60 @@
                         "achievement"
                       ],
                       "additionalProperties": {}
+                    },
+                    "i18n": {
+                      "type": "object",
+                      "properties": {
+                        "achievement": {
+                          "type": "object",
+                          "properties": {
+                            "en": {
+                              "type": "string"
+                            },
+                            "am": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "en",
+                            "am"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "recipientName": {
+                          "type": "object",
+                          "properties": {
+                            "en": {
+                              "type": "string"
+                            },
+                            "am": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "en",
+                            "am"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "issuerName": {
+                          "type": "object",
+                          "properties": {
+                            "en": {
+                              "type": "string"
+                            },
+                            "am": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "en",
+                            "am"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "additionalProperties": false
                     },
                     "proof": {
                       "type": "object",
@@ -1663,6 +1814,76 @@
                     },
                     "applyUrl": {
                       "type": "string"
+                    },
+                    "i18n": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "object",
+                          "properties": {
+                            "en": {
+                              "type": "string"
+                            },
+                            "am": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "en",
+                            "am"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "employer": {
+                          "type": "object",
+                          "properties": {
+                            "en": {
+                              "type": "string"
+                            },
+                            "am": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "en",
+                            "am"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "location": {
+                          "type": "object",
+                          "properties": {
+                            "en": {
+                              "type": "string"
+                            },
+                            "am": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "en",
+                            "am"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "payText": {
+                          "type": "object",
+                          "properties": {
+                            "en": {
+                              "type": "string"
+                            },
+                            "am": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "en",
+                            "am"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "additionalProperties": false
                     },
                     "description": {
                       "type": "object",

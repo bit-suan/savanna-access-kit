@@ -2,6 +2,11 @@ import type { Router } from "express";
 
 export type Json = Record<string, unknown>;
 
+export type LocalizedText = {
+  en: string;
+  am: string;
+};
+
 export type JobRecord = {
   id: string;
   title: string;
@@ -12,6 +17,12 @@ export type JobRecord = {
   validThrough?: string | null;
   employmentType?: string;
   applyUrl: string;
+  i18n?: {
+    title?: LocalizedText;
+    employer?: LocalizedText;
+    location?: LocalizedText;
+    payText?: LocalizedText;
+  };
   description: {
     en: string;
     am: string;
@@ -33,6 +44,10 @@ export type CredentialRecord = {
   expiresAt?: string | null;
   status: "valid" | "revoked" | "expired";
   proof?: Json | null;
+  i18n?: {
+    achievement?: LocalizedText;
+    recipientName?: LocalizedText;
+  };
 };
 
 export type CareerStore = {
@@ -48,6 +63,7 @@ export type CareerCtx = {
   secretKeys: Set<string>;
   publicBaseUrl: string;
   issuerName: string;
+  issuerNameEn?: string;
   issuerDid: string;
   signCredential: (payload: Json) => Json | null;
 };

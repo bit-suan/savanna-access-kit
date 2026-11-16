@@ -37,7 +37,9 @@ function canonicalJson(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map((item) => canonicalJson(item)).join(",")}]`;
   const obj = value as Record<string, unknown>;
-  const keys = Object.keys(obj).sort();
+  const keys = Object.keys(obj)
+    .filter((key) => obj[key] !== undefined)
+    .sort();
   return `{${keys.map((key) => `${JSON.stringify(key)}:${canonicalJson(obj[key])}`).join(",")}}`;
 }
 
@@ -85,6 +87,13 @@ export function toOpenBadge(record: CredentialRecord, ctx: CareerCtx): Json {
       id: ctx.issuerDid,
       type: ["Profile"],
       name: ctx.issuerName,
+    },
+    i18n: {
+      ...record.i18n,
+      issuerName: {
+        en: ctx.issuerNameEn ?? "Savanna Access Kit",
+        am: ctx.issuerName,
+      },
     },
     validFrom: record.validFrom,
     credentialStatus: {

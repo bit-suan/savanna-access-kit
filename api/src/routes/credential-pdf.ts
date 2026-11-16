@@ -11,8 +11,9 @@ import { verifyPageHtml } from "./verify.js";
 export async function renderCertificatePdf(
   record: CredentialRecord,
   ctx: CareerCtx,
+  lang: "am" | "en" = "am",
 ): Promise<Buffer> {
-  const html = await certificateHtml(record, ctx);
+  const html = await certificateHtml(record, ctx, lang);
   const browser = await chromium.launch({ headless: true });
   try {
     const page = await browser.newPage();
@@ -30,15 +31,30 @@ export async function renderCertificatePdf(
   }
 }
 
-async function certificateHtml(record: CredentialRecord, ctx: CareerCtx): Promise<string> {
-  const verify = await verifyPageHtml(record, ctx);
+async function certificateHtml(
+  record: CredentialRecord,
+  ctx: CareerCtx,
+  lang: "am" | "en",
+): Promise<string> {
+  const verify = await verifyPageHtml(record, ctx, lang);
   const status = effectiveStatus(record);
-  const statusAm = status === "valid" ? "ትክክለኛ" : status === "revoked" ? "ተሰርዟል" : "ጊዜው አልፏል";
-  const extra = `
-    <article lang="am">
-      <h1>${escapeHtml(record.achievement)}</h1>
-      <p>${escapeHtml(record.recipientName || "ተማሪ")} ከላይ የተጠቀሰውን ስኬት እንዳጠናቀቀ ይህ ሰነድ ያረጋግጣል።</p>
-      <p>በማውረድ ጊዜ ያለው ሁኔታ፦ ${statusAm}። በቀጥታ ለማረጋገጥ፦ ${escapeHtml(`${ctx.publicBaseUrl}/verify/${record.id}`)}።</p>
-    </article>`;
+  const achievement = escapeHtml(record.i18n?.achievement?.[lang] ?? record.achievement);
+  const recipient = escapeHtml(
+    record.i18n?.recipientName?.[lang] ?? record.recipientName ?? (lang === "am" ? "ተማሪ" : "Learner"),
+  );
+  const verifyUrl = escapeHtml(`${ctx.publicBaseUrl}/verify/${record.id}?lang=${lang}`);
+  const statusLabel = {
+    valid: lang === "am" ? "ትክክለኛ" : "Valid",
+    revoked: lang === "am" ? "ተሰርዟል" : "Revoked",
+    expired: lang === "am" ? "ጊዜው አልፏል" : "Expired",
+  }[status];
+  const extra =
+    lang === "en"
+      ? `<article lang="en"><h1>${achievement}</h1>
+        <p>This certificate confirms that ${recipient} earned this achievement.</p>
+        <p>Status at download: ${statusLabel}. Verify it at ${verifyUrl}.</p></article>`
+      : `<article lang="am"><h1>${achievement}</h1>
+        <p>${recipient} ከላይ የተጠቀሰውን ስኬት እንዳጠናቀቀ ይህ ሰነድ ያረጋግጣል።</p>
+        <p>በማውረድ ጊዜ ያለው ሁኔታ፦ ${statusLabel}። በቀጥታ ለማረጋገጥ፦ ${verifyUrl}።</p></article>`;
   return verify.replace("<main>", `<main>${extra}`);
 }

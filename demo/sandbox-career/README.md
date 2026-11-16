@@ -1,6 +1,6 @@
 # Member 3 — Career Gateway
 
-**Main task:** A blind learner opens the Savanna job board in Amharic, plays the audio job summary with keyboard alone, and downloads a verifiable PDF certificate — all without help from a sighted person.
+**Main task:** A learner opens the Savanna job board in Amharic or English, chooses their language, plays a job summary with keyboard alone, and downloads a verifiable PDF certificate.
 
 Owns: `<savanna-job-card>`, `<savanna-credential>`, jobs/credentials/verify API, JobPosting JSON-LD, hosted Open Badges verification, certificate PDF.
 
@@ -17,6 +17,9 @@ node harness/server.mjs
 ```
 
 Then open http://localhost:4020
+
+The no-build page and Vite demo both let users switch between Amharic and English.
+Verification, application, and PDF pages accept `?lang=am` or `?lang=en`.
 
 ```bash
 node --test test/api.node.test.mjs
@@ -44,9 +47,10 @@ npm run test:api
 npm test
 ```
 
-Automated checks: `node --test test/api.node.test.mjs` (API) and `npm test` (builds the
-bundle, then runs Playwright + axe-core, audio duration, 320 px reflow, 200%/400% zoom,
-keyboard and partner-page integration checks).
+Automated checks: `node --test test/api.node.test.mjs` (API) and
+`pnpm --filter sandbox-career test` (builds the bundle, then runs Playwright + axe-core,
+audio duration, 320 px reflow, 640/320 px zoom-equivalent widths, keyboard, bilingual
+pages and partner integration). Actual 200%/400% browser zoom remains a manual runbook check.
 
 ## Requirements and handoff
 
@@ -247,15 +251,17 @@ production-quality Amharic speech.
 ## Finished and not finished
 
 ### Finished
-- `<savanna-job-card>` with audio summary, transcript, Ethiopian calendar, 44 px targets, 320 px / 200 % / 400 % zoom ✅
-- `<savanna-credential>` with copy-link, LinkedIn link, PDF download ✅
+- User-selectable Amharic/English in the Vite and no-build demos, job/credential components, verification/apply pages and PDFs ✅
+- `<savanna-job-card>` with bilingual job facts, employment type, audio summary, transcript, Ethiopian calendar and 44 px targets ✅
+- `<savanna-credential>` with achievement, recipient, issuer, status, copy-link, LinkedIn link and selected-language PDF ✅
 - Jobs API with schema.org/JobPosting JSON-LD (`GET /v1/jobs/{id}.jsonld`) ✅
+- Prisma seed script for CareerGateway jobs and the C-7 demo credential ✅
 - Credentials API: 128-bit random ids, issue, fetch, revoke ✅
 - Verify page at `/verify/{id}` with QR code, alt text, copy-link ✅
 - One webhook (register/list/delete, `credential.issued` / `credential.revoked`) ✅
 - Open Badges 3.0 JSON-LD with `did:web` and Ed25519 draft proof ✅ (see below)
-- Amharic i18n complete with Ethiopic script ✅
-- Automated axe, zoom, keyboard, audio-duration tests (zero violations) ✅
+- Amharic and English localization for the CareerGateway UI ✅
+- Automated axe, narrow-width reflow, keyboard and audio-duration tests (zero violations) ✅
 - Savanna demo page at `savanna/pages/jobs.html` with test jobs JSON ✅
 
 ### Not finished / pending Saturday

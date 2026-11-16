@@ -5,7 +5,7 @@ import type { Ctx } from "../lib/context";
 import type { OperationDoc } from "../lib/openapi";
 import { pathParam, wantsJsonLd } from "./career-lib.js";
 import { didDocument, toOpenBadge } from "./open-badges.js";
-import { verifyPageHtml } from "./verify.js";
+import { pageLanguage, verifyPageHtml } from "./verify.js";
 import { createMember3CareerContext } from "./_member3-career-store.js";
 
 export const access = "public" as const;
@@ -34,7 +34,7 @@ export function register(router: Router, ctx: Ctx): void {
     const record = await career.store.getCredential(id);
     if (!record) throw new HttpError(404, "Not Found", `Credential ${id} was not found.`);
     const { renderCertificatePdf } = await import("./credential-pdf.js");
-    const pdf = await renderCertificatePdf(record, career);
+    const pdf = await renderCertificatePdf(record, career, pageLanguage(req.query.lang));
     res
       .type("application/pdf")
       .set("Content-Disposition", `attachment; filename="credential-${record.id}.pdf"`)
@@ -54,17 +54,25 @@ export function register(router: Router, ctx: Ctx): void {
         });
         return;
       }
+      const lang = pageLanguage(req.query.lang);
+      if (lang === "en") {
+        res.status(404).type("html").send(`<!doctype html>
+          <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>Credential not found</title></head><body><main><h1>Credential not found</h1>
+          <p>Check the link and try again.</p><a href="?lang=am" lang="am">አማርኛ</a></main></body></html>`);
+        return;
+      }
       res.status(404).type("html").send(`<!doctype html>
         <html lang="am"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
         <title>አልተገኘም</title></head><body><main><h1>የምስክር ወረቀቱ አልተገኘም</h1>
-        <p>አገናኙን ያረጋግጡና እንደገና ይሞክሩ።</p></main></body></html>`);
+        <p>አገናኙን ያረጋግጡና እንደገና ይሞክሩ።</p><a href="?lang=en" lang="en">English</a></main></body></html>`);
       return;
     }
     if (wantsJsonLd(req) && (req.header("accept") ?? "").includes("ld+json")) {
       res.type("application/ld+json").json(toOpenBadge(record, career));
       return;
     }
-    res.type("html").send(await verifyPageHtml(record, career));
+    res.type("html").send(await verifyPageHtml(record, career, pageLanguage(req.query.lang)));
   });
 }
 

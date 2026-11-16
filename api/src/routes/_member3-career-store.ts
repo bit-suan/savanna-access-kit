@@ -3,7 +3,14 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Ctx } from "../lib/context";
 import { signPayload } from "./open-badges.js";
-import type { CareerCtx, CareerStore, CredentialRecord, JobRecord, Json } from "./career-types.js";
+import type {
+  CareerCtx,
+  CareerStore,
+  CredentialRecord,
+  JobRecord,
+  Json,
+  LocalizedText,
+} from "./career-types.js";
 
 type PrismaDelegate = {
   findMany(args?: Record<string, unknown>): Promise<unknown[]>;
@@ -30,30 +37,79 @@ const amharicContent = JSON.parse(
   jobs: Record<string, Pick<JobRecord, "title" | "employer" | "location" | "payText">>;
   credentials: Record<string, Pick<CredentialRecord, "recipientName" | "achievement">>;
   issuerName: string;
+  issuerNameEn?: string;
 };
 const jobIndex = JSON.parse(readFileSync(path.join(fixturesDir, "jobs.json"), "utf8")) as {
   jobs: Array<{ id: string }>;
 };
 
+const englishJobs = new Map(
+  jobIndex.jobs.map(({ id }) => [
+    id,
+    JSON.parse(readFileSync(path.join(fixturesDir, "jobs", `${id}.json`), "utf8")) as JobRecord,
+  ]),
+);
+const seedCredentialFixture = JSON.parse(
+  readFileSync(path.join(fixturesDir, "credentials", "C-7.json"), "utf8"),
+) as CredentialRecord;
+
+function localizedText(en?: string | null, am?: string | null): LocalizedText | undefined {
+  if (en == null && am == null) return undefined;
+  return { en: en ?? am ?? "", am: am ?? en ?? "" };
+}
+
 function localizeJob(job: JobRecord): JobRecord {
-  return { ...job, ...amharicContent.jobs[job.id] };
+  const english = englishJobs.get(job.id) ?? job;
+  const amharic: (typeof amharicContent.jobs)[string] =
+    amharicContent.jobs[job.id] ?? {
+      title: job.title,
+      employer: job.employer,
+      location: job.location,
+      payText: job.payText,
+    };
+  return {
+    ...job,
+    ...amharic,
+    i18n: {
+      title: localizedText(english.title, amharic.title ?? job.title),
+      employer: localizedText(english.employer, amharic.employer ?? job.employer),
+      location: localizedText(english.location, amharic.location ?? job.location),
+      payText: localizedText(english.payText, amharic.payText ?? job.payText),
+    },
+  };
 }
 
 function localizeCredential(record: CredentialRecord): CredentialRecord {
-  return { ...record, ...amharicContent.credentials[record.id] };
+  const english = record.id === seedCredentialFixture.id ? seedCredentialFixture : record;
+  const amharic: (typeof amharicContent.credentials)[string] =
+    amharicContent.credentials[record.id] ?? {
+      achievement: record.achievement,
+      recipientName: record.recipientName ?? undefined,
+    };
+  return {
+    ...record,
+    ...amharic,
+    i18n: {
+      achievement:
+        record.i18n?.achievement ??
+        localizedText(english.achievement, amharic.achievement ?? record.achievement),
+      recipientName:
+        record.i18n?.recipientName ??
+        localizedText(
+          english.recipientName,
+          amharic.recipientName ?? record.recipientName,
+        ),
+    },
+  };
 }
 
 const memoryJobs = new Map(
   jobIndex.jobs.map(({ id }) => [
     id,
-    localizeJob(
-      JSON.parse(readFileSync(path.join(fixturesDir, "jobs", `${id}.json`), "utf8")) as JobRecord,
-    ),
+    localizeJob(englishJobs.get(id)!),
   ]),
 );
-const seedCredential = localizeCredential(JSON.parse(
-  readFileSync(path.join(fixturesDir, "credentials", "C-7.json"), "utf8"),
-) as CredentialRecord);
+const seedCredential = localizeCredential(seedCredentialFixture);
 const memoryCredentials = new Map<string, CredentialRecord>([[seedCredential.id, seedCredential]]);
 
 function prismaFor(ctx: Ctx): CareerPrismaClient | undefined {
@@ -87,6 +143,7 @@ function credentialFromPrisma(value: unknown): CredentialRecord {
     expiresAt: row.expiresAt ? dateString(row.expiresAt) : null,
     status: row.status as CredentialRecord["status"],
     proof: (row.proof as Json | null | undefined) ?? null,
+    i18n: (row.i18n as CredentialRecord["i18n"] | null | undefined) ?? undefined,
   });
 }
 
@@ -101,6 +158,7 @@ function credentialData(record: CredentialRecord): Record<string, unknown> {
     expiresAt: record.expiresAt ? new Date(record.expiresAt) : null,
     status: record.status,
     proof: record.proof ?? undefined,
+    i18n: record.i18n ?? undefined,
   };
 }
 
@@ -151,6 +209,7 @@ export function createMember3CareerContext(ctx: Ctx): CareerCtx {
     secretKeys: new Set([ctx.config.secretKey]),
     publicBaseUrl,
     issuerName: amharicContent.issuerName,
+    issuerNameEn: amharicContent.issuerNameEn ?? "Savanna Access Kit",
     issuerDid,
     signCredential(payload) {
       return {

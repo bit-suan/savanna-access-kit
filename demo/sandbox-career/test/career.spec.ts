@@ -1,15 +1,17 @@
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
-// FIXME: blocked until Member 3's job-card component is merged
-test.fixme("job card and credential render and pass axe", async ({ page }) => {
+test("job card and credential render and pass axe", async ({ page }) => {
   await page.goto("/");
   await expect(
     page.getByRole("heading", { name: "የተደራሽ ትምህርት ድጋፍ ባለሙያ" }),
   ).toBeVisible();
+  await expect(page.getByText("ሙሉ ጊዜ")).toBeVisible();
   await expect(page.getByRole("link", { name: /ለዚህ ስራ ያመልክቱ/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /የድምጽ ማጠቃለያ አጫውት/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: "የምስክር ወረቀት", exact: true })).toBeVisible();
+  await expect(page.getByText("ማሳያ ተማሪ")).toBeVisible();
+  await expect(page.getByText("የሳቫና ተደራሽነት ኪት")).toBeVisible();
 
   const results = await new AxeBuilder({ page }).analyze();
   // Hackathon gate (deck s14): axe-core clean — zero critical and zero serious.
@@ -20,8 +22,7 @@ test.fixme("job card and credential render and pass axe", async ({ page }) => {
   expect(results.violations, JSON.stringify(results.violations, null, 2)).toEqual([]);
 });
 
-// FIXME: blocked until Member 3's job-card component is merged
-test.fixme("320px viewport has no horizontal scroll", async ({ page }) => {
+test("320px viewport has no horizontal scroll", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 720 });
   await page.goto("/");
   await expect(
@@ -34,22 +35,44 @@ test.fixme("320px viewport has no horizontal scroll", async ({ page }) => {
   expect(scroll.scroll).toBeLessThanOrEqual(scroll.inner + 1);
 });
 
-// FIXME: blocked until Member 3's job-card component is merged
-test.fixme("200% and 400% zoom keep a single column", async ({ page }) => {
-  await page.goto("/");
-  for (const zoom of [2, 4]) {
-    await page.evaluate((z) => {
-      document.body.style.zoom = String(z);
-    }, zoom);
-    const article = page.locator("savanna-job-card").first();
-    await expect(article).toBeVisible();
-    const box = await article.boundingBox();
-    expect(box).toBeTruthy();
+test("200% and 400% zoom-equivalent widths reflow without horizontal scroll", async ({ page }) => {
+  for (const width of [640, 320]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/");
+    const dimensions = await page.evaluate(() => ({
+      viewport: document.documentElement.clientWidth,
+      content: document.documentElement.scrollWidth,
+    }));
+    expect(dimensions.content).toBeLessThanOrEqual(dimensions.viewport + 1);
+    const columns = await page
+      .locator("savanna-job-card")
+      .first()
+      .evaluate((element) => {
+        const facts = element.shadowRoot!.querySelector("dl")!;
+        return getComputedStyle(facts).gridTemplateColumns.split(" ").length;
+      });
+    expect(columns).toBe(1);
   }
 });
 
-// FIXME: blocked until Member 3's job-card component is merged
-test.fixme("keyboard can play audio summary and open apply", async ({ page }) => {
+test("job and credential action targets are at least 44px", async ({ page }) => {
+  await page.goto("/");
+  for (const selector of ["savanna-job-card", "savanna-credential"]) {
+    const sizes = await page.locator(selector).evaluate((element) =>
+      Array.from(element.shadowRoot!.querySelectorAll("button, a.action")).map((control) => {
+        const rect = control.getBoundingClientRect();
+        return { width: rect.width, height: rect.height };
+      }),
+    );
+    expect(sizes.length).toBeGreaterThan(0);
+    for (const size of sizes) {
+      expect(size.width).toBeGreaterThanOrEqual(44);
+      expect(size.height).toBeGreaterThanOrEqual(44);
+    }
+  }
+});
+
+test("keyboard can play audio summary and open apply", async ({ page }) => {
   await page.goto("/");
   const play = page.locator("savanna-job-card").getByRole("button");
   await play.focus();
@@ -61,12 +84,11 @@ test.fixme("keyboard can play audio summary and open apply", async ({ page }) =>
   await expect(page.getByRole("link", { name: /ለዚህ ስራ ያመልክቱ/ }).first()).toBeFocused();
 });
 
-// FIXME: blocked until Member 3's job-card component is merged
-test.fixme("Amharic job dates use the Ethiopian calendar", async ({ page }) => {
+test("Amharic job dates use the Ethiopian calendar", async ({ page }) => {
   await page.goto("/");
   const jobCard = page.locator("savanna-job-card").first();
   await expect(jobCard.locator("article[lang='am']")).toBeVisible();
-  const displayedDate = await jobCard.locator("dl dd").nth(3).textContent();
+  const displayedDate = await jobCard.locator("dl dd").nth(4).textContent();
   const calendar = await page.evaluate(() => {
     const formatter = new Intl.DateTimeFormat("am-ET-u-ca-ethiopic", {
       day: "numeric",
@@ -117,7 +139,60 @@ test.fixme("Amharic job dates use the Ethiopian calendar", async ({ page }) => {
 
   const credential = page.locator("savanna-credential");
   await expect(credential.locator("article[lang='am']")).toBeVisible();
-  await expect(credential.locator("article p").nth(1)).toContainText(calendar.credentialIssued);
+  await expect(credential.locator("article p").nth(3)).toContainText(calendar.credentialIssued);
+});
+
+test("language switch toggles the whole demo between Amharic and English", async ({ page }) => {
+  await page.goto("/");
+  const jobCard = page.locator("savanna-job-card").first();
+  const credential = page.locator("savanna-credential");
+  // Amharic is the default.
+  await expect(page.locator("html")).toHaveAttribute("lang", "am");
+  await expect(
+    jobCard.getByRole("heading", { name: "የተደራሽ ትምህርት ድጋፍ ባለሙያ" }),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "English" }).click();
+
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(
+    jobCard.getByRole("heading", { name: "Accessible Learning Support Associate" }),
+  ).toBeVisible();
+  await expect(jobCard.getByText("Full-time", { exact: true })).toBeVisible();
+  await expect(jobCard.getByRole("link", { name: /Apply for this job/ })).toHaveAttribute(
+    "href",
+    /lang=en$/,
+  );
+  await expect(credential.locator("article[lang='en']")).toBeVisible();
+  await expect(credential.getByText("Digital Bridge — Accessible Media Basics")).toBeVisible();
+  await expect(credential.getByText("Demo Learner")).toBeVisible();
+  await expect(credential.getByText("Savanna Access Kit")).toBeVisible();
+  await expect(
+    credential.getByRole("link", { name: "Download PDF certificate" }),
+  ).toHaveAttribute("href", /lang=en$/);
+
+  await page.getByRole("button", { name: "አማርኛ" }).click();
+
+  await expect(page.locator("html")).toHaveAttribute("lang", "am");
+  await expect(
+    jobCard.getByRole("heading", { name: "የተደራሽ ትምህርት ድጋፍ ባለሙያ" }),
+  ).toBeVisible();
+});
+
+test("no-build harness page also supports both languages", async ({ page }) => {
+  await page.goto("http://localhost:4020/");
+  await expect(page.locator("html")).toHaveAttribute("lang", "am");
+  await expect(page.getByRole("heading", { name: "የሳቫና የሥራ መግቢያ ማሳያ" })).toBeVisible();
+  await page.getByRole("button", { name: "English" }).click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(page.getByRole("heading", { name: "Savanna Career Gateway demo" })).toBeVisible();
+  await expect(
+    page.locator("savanna-job-card").first().getByRole("heading", {
+      name: "Accessible Learning Support Associate",
+    }),
+  ).toBeVisible();
+  await expect(page.locator("savanna-credential").getByText("Demo Learner")).toBeVisible();
+  await expect(page.locator("savanna-credential").getByText("Savanna Access Kit")).toBeVisible();
 });
 
 test("verify page is readable and copy works", async ({ page }) => {
@@ -134,6 +209,27 @@ test("apply form shows error summary without a timeout", async ({ page }) => {
   await page.goto("http://localhost:4020/apply/J-9");
   await page.getByRole("button", { name: "ማመልከቻውን ላክ" }).click();
   await expect(page.getByRole("alert")).toContainText("እባክዎ ይሙሉ");
+});
+
+test("verification and application pages offer English", async ({ page }) => {
+  await page.goto("http://localhost:4020/verify/C-7?lang=en");
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(page.getByRole("heading", { name: "Certificate verification" })).toBeVisible();
+  await expect(page.getByText("Digital Bridge — Accessible Media Basics")).toBeVisible();
+  await expect(page.getByText("Demo Learner")).toBeVisible();
+  const pdfLink = page.getByRole("link", { name: "Download certificate" });
+  await expect(pdfLink).toHaveAttribute("href", /lang=en$/);
+  const pdfResponse = await page.request.get(
+    `http://localhost:4020${await pdfLink.getAttribute("href")}`,
+  );
+  expect(pdfResponse.status()).toBe(200);
+  expect(pdfResponse.headers()["content-type"]).toContain("application/pdf");
+
+  await page.goto("http://localhost:4020/apply/J-9?lang=en");
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(page.getByRole("heading", { name: "Apply for job J-9" })).toBeVisible();
+  await page.getByRole("button", { name: "Submit application" }).click();
+  await expect(page.getByRole("alert")).toContainText("Please complete");
 });
 
 test("verification and apply pages reflow at 320px", async ({ page }) => {
@@ -174,8 +270,7 @@ test("bilingual job audio assets stay within the 20 to 30 second target", async 
   expect(outOfRange).toEqual([]);
 });
 
-// FIXME: blocked until Member 3's job-card component is merged
-test.fixme("built component bundle works from a partner-host integration page", async ({ page }) => {
+test("built component bundle works from a partner-host integration page", async ({ page }) => {
   await page.goto("/partner-demo.html");
   await expect(
     page.getByRole("heading", { name: "የተደራሽ ትምህርት ድጋፍ ባለሙያ" }),
@@ -185,15 +280,14 @@ test.fixme("built component bundle works from a partner-host integration page", 
     .locator("savanna-credential")
     .getByRole("link", { name: "ምስክር ወረቀቱን አውርድ" });
   const pdfHref = await pdfLink.getAttribute("href");
-  expect(pdfHref).toMatch(/\/verify\/[^/]+\/pdf$/);
+  expect(pdfHref).toMatch(/\/verify\/[^/]+\/pdf\?lang=am$/);
   expect(pdfHref).not.toContain("api-key");
   const pdf = await page.request.get(new URL(pdfHref!, page.url()).toString());
   expect(pdf.status()).toBe(200);
   expect(pdf.headers()["content-type"]).toContain("application/pdf");
 });
 
-// FIXME: blocked until Member 3's job-card component is merged
-test.fixme("host frameworks can update attributes and observe component events", async ({ page }) => {
+test("host frameworks can update attributes and observe component events", async ({ page }) => {
   await page.goto("/partner-demo.html");
   const jobCard = page.locator("savanna-job-card");
   const credential = page.locator("savanna-credential");

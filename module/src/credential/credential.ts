@@ -6,10 +6,18 @@ import { resolveLang } from "./prefs.js";
 
 type Strings = typeof en;
 
+type Localized = { en?: string | null; am?: string | null };
+
 type Badge = {
   id: string;
   name?: string;
   validFrom?: string;
+  i18n?: {
+    achievement?: Localized;
+    recipientName?: Localized;
+    issuerName?: Localized;
+  };
+  issuer?: { name?: string };
   credentialStatus?: { status?: string };
   credentialSubject?: {
     name?: string;
@@ -130,6 +138,32 @@ export class SavannaCredential extends LitElement {
     return resolveLang(this, this.lang);
   }
 
+  /** Prefer the bilingual `i18n` value; fall back to the badge's flat name. */
+  private achievementName(): string {
+    return (
+      this.data?.i18n?.achievement?.[this.activeLang()] ??
+      this.data?.credentialSubject?.achievement?.name ??
+      this.data?.name ??
+      ""
+    );
+  }
+
+  private recipientName(): string {
+    return (
+      this.data?.i18n?.recipientName?.[this.activeLang()] ??
+      this.data?.credentialSubject?.name ??
+      this.t("cred.privateRecipient")
+    );
+  }
+
+  private issuerName(): string {
+    return (
+      this.data?.i18n?.issuerName?.[this.activeLang()] ??
+      this.data?.issuer?.name ??
+      ""
+    );
+  }
+
   private apiRoot(): string {
     return (this.api || "").replace(/\/$/, "");
   }
@@ -200,8 +234,7 @@ export class SavannaCredential extends LitElement {
   }
 
   private linkedInHref(): string {
-    const name =
-      this.data?.credentialSubject?.achievement?.name ?? this.data?.name ?? "Savanna credential";
+    const name = this.achievementName() || "Savanna credential";
     const year = this.data?.validFrom
       ? new Date(this.data.validFrom).getFullYear()
       : new Date().getFullYear();
@@ -209,7 +242,8 @@ export class SavannaCredential extends LitElement {
     const params = new URLSearchParams({
       startTask: "CERTIFICATION_NAME",
       name,
-      organizationName: "የሳቫና ተደራሽነት ኪት",
+      organizationName:
+        this.activeLang() === "am" ? "የሳቫና ተደራሽነት ኪት" : "Savanna Access Kit",
       issueYear: String(year),
       issueMonth: String(month),
       certUrl: this.verifyUrl(),
@@ -224,8 +258,9 @@ export class SavannaCredential extends LitElement {
     }
     if (!this.data) return html`<p>${this.t("cred.loading")}</p>`;
     const lang = this.activeLang();
-    const achievement =
-      this.data.credentialSubject?.achievement?.name ?? this.data.name ?? "Credential";
+    const achievement = this.achievementName() || "Credential";
+    const recipient = this.recipientName();
+    const issuer = this.issuerName();
     const issued = this.data.validFrom
       ? new Intl.DateTimeFormat(lang === "am" ? "am-ET-u-ca-ethiopic" : "en-GB", {
           day: "numeric",
@@ -236,7 +271,9 @@ export class SavannaCredential extends LitElement {
       : "";
     return html`
       <article lang=${lang}>
-        <h2>${this.t("cred.heading")}፦ ${achievement}</h2>
+        <h2>${this.t("cred.heading")}${lang === "am" ? "፦" : ":"} ${achievement}</h2>
+        <p>${this.t("cred.recipient")}: ${recipient}</p>
+        <p>${this.t("cred.issuer")}: ${issuer}</p>
         <p>${this.t("cred.status")}: ${this.t(this.statusKey())}</p>
         <p>${this.t("cred.issued")}: ${issued}</p>
         <div class="row">
@@ -247,7 +284,7 @@ export class SavannaCredential extends LitElement {
           <a class="action" href=${this.verifyUrl()}>${this.t("cred.verify")}</a>
           <a
             class="action"
-            href=${`${this.apiRoot()}/verify/${encodeURIComponent(this.credentialId())}/pdf`}
+            href=${`${this.apiRoot()}/verify/${encodeURIComponent(this.credentialId())}/pdf?lang=${lang}`}
             >${this.t("cred.pdf")}</a
           >
         </div>

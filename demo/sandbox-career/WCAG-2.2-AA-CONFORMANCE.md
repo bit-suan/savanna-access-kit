@@ -10,7 +10,7 @@ the host page shell (those are other members' surfaces).
 | --------- | ------------------------------------------------------------------------------------------ |
 | Product   | Savanna Access Kit — Career Gateway                                                        |
 | Target    | WCAG 2.2 Level AA                                                                          |
-| Evaluated | 14 November 2026 (automated + source review); manual screen-reader/PDF pass on 15 November |
+| Evaluated | 15 November 2026 (automated tests + source review; manual gates remain pending)          |
 | Evaluator | Member 3 (self-assessment)                                                                 |
 | Contact   | see the Telegram group `t.me/AccessibilityHackathon2026`                                   |
 
@@ -18,9 +18,9 @@ the host page shell (those are other members' surfaces).
 
 ```bash
 cd demo/sandbox-career
-node harness/server.mjs          # API + sandbox on http://localhost:4020
+node harness/server.mjs                    # API + no-build sandbox on http://localhost:4020
+pnpm --filter sandbox-career test          # Playwright + axe-core and production bundle
 node --test test/api.node.test.mjs
-npm install && npm test          # Playwright + axe-core: axe, 320 px, 200%/400% zoom, keyboard
 ```
 
 ## Evidence
@@ -28,8 +28,9 @@ npm install && npm test          # Playwright + axe-core: axe, 320 px, 200%/400%
 - **axe-core** (`@axe-core/playwright`, `test/career.spec.ts`): asserts **zero critical and
   zero serious** violations, and in fact zero violations of any impact, on the sandbox
   page carrying the job card and the credential. This is the deck's gate (slide 14).
-- **Reflow**: 320 px viewport with no horizontal scroll, and single-column at 200% and
-  400% zoom (`career.spec.ts`).
+- **Reflow**: 320 px viewport with no horizontal scroll; automated tests also exercise
+  640 px and 320 px widths as 200%/400%-equivalent reflow checks. Actual browser zoom is
+  still a manual check in `SATURDAY-TASKS.md`.
 - **Keyboard**: play/stop audio, focus the Apply link, submit the apply form — all with
   the keyboard only (`career.spec.ts`).
 - **Contrast** (measured, WCAG 2.x formula): button text on accent 6.70:1, accent on white
@@ -51,7 +52,7 @@ npm install && npm test          # Playwright + axe-core: axe, 320 px, 200%/400%
 | 1.3.5 Identify Input Purpose            | AA    | Supports       | `autocomplete` on apply form fields                                  |
 | 1.4.1 Use of Color                      | A     | Supports       | Status is text ("Valid"/"Revoked"/"Expired"), not colour alone       |
 | 1.4.3 Contrast (Minimum)                | AA    | Supports       | Measured ratios above, all ≥ 4.5:1                                   |
-| 1.4.4 Resize Text                       | AA    | Supports       | rem-based type; 200%/400% zoom tested                                |
+| 1.4.4 Resize Text                       | AA    | Needs manual   | rem-based type; narrow-width checks pass, actual 200%/400% zoom pending |
 | 1.4.10 Reflow                           | AA    | Supports       | 320 px, no horizontal scroll                                         |
 | 1.4.11 Non-text Contrast                | AA    | Supports       | Focus outline and borders ≥ 3:1 on their backgrounds                 |
 | 1.4.12 Text Spacing                     | AA    | Supports       | No fixed heights that clip; `overflow-wrap: anywhere`                |
@@ -68,7 +69,7 @@ npm install && npm test          # Playwright + axe-core: axe, 320 px, 200%/400%
 | 2.4.11 Focus Not Obscured (Minimum)     | AA    | Supports       | No sticky/overlay elements cover the focused control                 |
 | 2.5.3 Label in Name                     | A     | Supports       | Visible labels match accessible names                                |
 | 2.5.8 Target Size (Minimum)             | AA    | Supports       | Targets are 44 × 44 px (above the 24 px minimum)                     |
-| 3.1.1 Language of Page                  | A     | Supports       | `lang="en"` on pages, `lang` per component                           |
+| 3.1.1 Language of Page                  | A     | Supports       | User can switch `lang` between `am` and `en` on each CareerGateway surface |
 | 3.1.2 Language of Parts                 | AA    | Supports       | Amharic content marked `lang="am"`                                   |
 | 3.2.6 Consistent Help                   | A     | Supports       | Help/verify links sit in a consistent place                          |
 | 3.3.1 Error Identification              | A     | Supports       | Apply form shows a text error summary and moves focus                |
@@ -84,6 +85,8 @@ before submitting.
 
 - [ ] A co-designer completes the main task unaided with **NVDA**, **TalkBack**, keyboard
       only, 200% zoom and **sound off** (deck slide 14).
+- [ ] Manually verify actual browser zoom at 200% and 400%; automated narrow-width checks
+      are evidence for reflow, but do not replace browser zoom testing.
 - [ ] Certificate PDF: **PAC 2024** and **veraPDF (PDF/UA-1)** pass; NVDA reads tags in order.
 - [ ] Ethiopian calendar check: Amharic dates render in the Ge'ez calendar (`am-ET-u-ca-ethiopic`).
 

@@ -11,6 +11,8 @@ const AudioSummarySchema = z.object({
   transcript: z.string(),
 });
 
+const LocalizedTextSchema = z.object({ en: z.string(), am: z.string() });
+
 const JobSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -21,6 +23,14 @@ const JobSchema = z.object({
   validThrough: z.string().nullable().optional(),
   employmentType: z.string().optional(),
   applyUrl: z.string(),
+  i18n: z
+    .object({
+      title: LocalizedTextSchema.optional(),
+      employer: LocalizedTextSchema.optional(),
+      location: LocalizedTextSchema.optional(),
+      payText: LocalizedTextSchema.optional(),
+    })
+    .optional(),
   description: z.object({
     en: z.string(),
     am: z.string(),

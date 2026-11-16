@@ -16,7 +16,17 @@ const IssueCredentialSchema = z.object({
   achievement: z.string().min(1).max(200),
   recipientName: z.string().min(1).max(200).optional(),
   expiresAt: z.iso.datetime().optional(),
+  i18n: z
+    .object({
+      achievement: z.object({ en: z.string().min(1).max(200), am: z.string().min(1).max(200) }).optional(),
+      recipientName: z
+        .object({ en: z.string().min(1).max(200), am: z.string().min(1).max(200) })
+        .optional(),
+    })
+    .optional(),
 });
+
+const LocalizedTextSchema = z.object({ en: z.string(), am: z.string() });
 
 const IdParams = z.object({
   id: z.string().min(1).describe("Credential id."),
@@ -41,6 +51,13 @@ const OpenBadgeSchema = z.looseObject({
     identifier: z.string(),
     achievement: z.looseObject({ id: z.string(), type: z.array(z.string()), name: z.string() }),
   }),
+  i18n: z
+    .object({
+      achievement: LocalizedTextSchema.optional(),
+      recipientName: LocalizedTextSchema.optional(),
+      issuerName: LocalizedTextSchema.optional(),
+    })
+    .optional(),
   proof: z.looseObject({ type: z.string(), verificationMethod: z.string() }).optional(),
 });
 
@@ -65,6 +82,7 @@ export function register(router: Router, ctx: Ctx): void {
       expiresAt: input.expiresAt ?? null,
       status: "valid",
       proof: null,
+      i18n: input.i18n,
     };
     const badge = toOpenBadge(record, career);
     record.proof = (badge.proof as Json | undefined) ?? null;
