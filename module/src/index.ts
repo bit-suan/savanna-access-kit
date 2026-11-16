@@ -16,6 +16,9 @@ import "./audio-description/audio-description.js";
 import "./offline/offline.js";
 import "./job-card/job-card.js";
 import "./credential/credential.js";
+import "./access-label/access-label.js";
+import "./profiles/profiles.js";
+import "./share/share-button.js";
 
 export { SavannaPlayer } from "./player/savanna-player.js";
 export { SavannaSignWindow } from "./sign-window/sign-window.js";
@@ -23,3 +26,6 @@ export { SavannaAudioDescription } from "./audio-description/audio-description.j
 export { SavannaOffline } from "./offline/offline.js";
 export { SavannaJobCard } from "./job-card/job-card.js";
 export { SavannaCredential } from "./credential/credential.js";
+export { SavannaAccessLabel } from "./access-label/access-label.js";
+export { SavannaAccessProfiles } from "./profiles/profiles.js";
+export { SavannaShareButton } from "./share/share-button.js";

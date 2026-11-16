@@ -550,6 +550,15 @@
                   <p><img src="../assets/img/VA-Content-Banner.png" alt="VA-Content-Banner" loading="lazy" /></p>
                   <!-- Savanna Access Kit: Accessible Video Player & Adaptive Learning Media -->
                   <div class="savanna-player-mount" style="margin: 1.5rem 0;">
+                    <!-- Extras (Addendum 1.2): Access Label & Set up for me -->
+                    <savanna-access-label
+                      lesson="L-102"
+                      api="http://localhost:4010"
+                      api-key="pk_dev_local"
+                    ></savanna-access-label>
+
+                    <savanna-access-profiles></savanna-access-profiles>
+
                     <savanna-player
                       id="lesson-player"
                       lesson="L-102"
@@ -561,6 +570,15 @@
                       <savanna-audio-description></savanna-audio-description>
                       <savanna-offline api="http://localhost:4010" api-key="pk_dev_local" lesson-id="L-102"></savanna-offline>
                     </savanna-player>
+
+                    <!-- Extras (Addendum 1.2): Lesson in a File -->
+                    <div style="margin-top: 1rem;">
+                      <savanna-share-button
+                        lesson="L-102"
+                        api="http://localhost:4010"
+                        api-key="pk_dev_local"
+                      ></savanna-share-button>
+                    </div>
                   </div>
                   <figure>
                     <img src="../assets/img/1lhlc1k4XRfVWDFTjczeaSoRpKlMY3dAX.png" alt="Evon afro" loading="lazy" />
