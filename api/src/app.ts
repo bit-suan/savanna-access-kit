@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -54,6 +55,12 @@ export async function createApp(opts: AppOptions = {}) {
   app.get(["/v1/openapi.json", "/api/v1/openapi.json"], (_req, res) => void res.json(spec));
   const swaggerDist = createRequire(import.meta.url)("swagger-ui-dist").getAbsoluteFSPath() as string;
   app.use("/docs/assets", express.static(swaggerDist, { index: false }));
+
+  // Static media fixtures (videos, audio, WebVTT captions)
+  const mediaDir = path.resolve(here, "../../contracts/fixtures/media");
+  if (fs.existsSync(mediaDir)) {
+    app.use("/media", express.static(mediaDir));
+  }
   app.get("/docs/init.js", (_req, res) =>
     void res.type("application/javascript").send('window.ui = SwaggerUIBundle({ url: "/v1/openapi.json", dom_id: "#swagger-ui", persistAuthorization: true });'),
   );

@@ -45,6 +45,11 @@ describe("contract C1: fixtures and API agree", () => {
   it("transcript fixtures satisfy the transcript schema", () => {
     expect(TranscriptSchema.safeParse(readJson("L-102/transcript.json")).success).toBe(true);
   });
+  it("serves static media files from /media/ for player playback", async () => {
+    const res = await request(await app()).get("/media/lesson.mp4");
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toContain("video/mp4");
+  });
 });
 
 describe("lessons routes", () => {
