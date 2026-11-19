@@ -9,8 +9,6 @@
 
 > The API runs on a free tier and may take up to a minute to wake up on first load.
 
-> The API runs on a free tier and may take up to a minute to wake up on first load.
-
 **Team Members:**
 - **Ruth Areda** (@Ruthareda) — *Member 1: Player Experience*
 - **Ekram Tofik** (@EkramTofik) — *Member 2: Media Access*
