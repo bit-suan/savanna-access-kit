@@ -201,7 +201,44 @@ const server = http.createServer((req, res) => {
     }
   }
 
-  // 7. Fallback for /dist/ bundle requests to savanna/module
+  // 7. Interactive OpenAPI Docs (Swagger UI)
+  if (pathname === "/docs" || pathname === "/docs/") {
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.end(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Savanna Access Kit API — Interactive Documentation</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+  <style>
+    body { margin: 0; background: #fafafa; font-family: system-ui, sans-serif; }
+    .top-banner { background: #002b56; color: white; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; }
+    .top-banner a { color: #facc15; text-decoration: none; font-weight: 600; font-size: 0.9rem; }
+    .swagger-ui .topbar { display: none; }
+  </style>
+</head>
+<body>
+  <div class="top-banner">
+    <div><strong>Savanna Access Kit</strong> · OpenAPI 3.1 Interactive Documentation</div>
+    <div><a href="/">&larr; Back to Portal</a></div>
+  </div>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>
+    window.ui = SwaggerUIBundle({
+      url: "/openapi.yaml",
+      dom_id: "#swagger-ui",
+      deepLinking: true,
+      persistAuthorization: true
+    });
+  </script>
+</body>
+</html>`);
+    return;
+  }
+
+  // 8. Fallback for /dist/ bundle requests to savanna/module
   if (pathname === "/dist/savanna-access.v1.js" || pathname === "/dist/savanna-access.v1.js.map") {
     const fallbackPath = path.join(root, "savanna/module", path.basename(pathname));
     if (fs.existsSync(fallbackPath)) {
@@ -210,7 +247,7 @@ const server = http.createServer((req, res) => {
     }
   }
 
-  // 8. General static files
+  // 9. General static files
   let localFile = path.resolve(root, "." + pathname);
   if (fs.existsSync(localFile) && fs.statSync(localFile).isDirectory()) {
     localFile = path.join(localFile, "index.html");

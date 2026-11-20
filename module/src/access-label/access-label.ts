@@ -194,7 +194,8 @@ export class SavannaAccessLabel extends LitElement {
 
       // 2. data-manifest-url or API endpoint
       if (!manifest) {
-        const url = this.manifestUrl || (this.api ? `${this.api.replace(/\/$/, "")}/v1/lessons/${this.lesson || "L-102"}` : "");
+        const apiBase = (this.api || "").replace(/\/$/, "");
+        const url = this.manifestUrl || `${apiBase}/v1/lessons/${this.lesson || "L-102"}`;
         if (url) {
           const headers: Record<string, string> = {};
           if (this.apiKey) headers["X-Savanna-Key"] = this.apiKey;
