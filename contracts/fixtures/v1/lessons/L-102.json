@@ -4,28 +4,35 @@
     "en": "Introduction to databases",
     "am": "የመረጃ ቋት መግቢያ"
   },
-  "durationSec": 12,
+  "durationSec": 120,
   "media": {
-    "video": "http://localhost:4010/media/lesson.mp4",
-    "audio": "http://localhost:4010/media/lesson.opus"
+    "video": "/media/lesson.mp4",
+    "audio": "/media/lesson.opus"
   },
   "captions": [
     {
       "lang": "en",
-      "url": "http://localhost:4010/media/en.vtt"
+      "url": "/media/en.vtt"
     },
     {
       "lang": "am",
-      "url": "http://localhost:4010/media/am.vtt"
+      "url": "/media/am.vtt"
     }
   ],
-  "sign": null,
-  "audioDescription": null,
+  "sign": {
+    "url": "/media/esl-placeholder.mp4",
+    "offsetMs": 0
+  },
+  "audioDescription": {
+    "audioUrl": "/media/ad.opus",
+    "vttUrl": "/media/ad.vtt",
+    "extended": true
+  },
   "transcript": {
     "url": "/v1/lessons/L-102/transcript"
   },
   "pack": {
     "manifestUrl": "/v1/lessons/L-102/pack",
-    "sizeBytes": 1800000
+    "sizeBytes": 212000
   }
 }

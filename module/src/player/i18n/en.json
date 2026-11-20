@@ -2,6 +2,7 @@
   "player.controlsLabel": "Player controls",
   "player.play": "Play",
   "player.back10": "Rewind 10 seconds",
+  "player.fwd10": "Forward 10 seconds",
   "player.seekSlider": "Video position",
   "player.positionValueTextSeconds": "Position {curSec} {secUnit} of {totalSec} {totalSecUnit}",
   "player.positionValueText": "Position {curMin} {minUnit} {curSec} of {totalMin} {totalMinUnit}",

@@ -21,3 +21,26 @@ a[aria-current="true"] > div > span,
 #sidebar a:hover {
   color: #0c4a6e !important;
 }
+
+/* Responsive code blocks and overflow protection */
+html,
+body {
+  overflow-x: hidden !important;
+  max-width: 100vw !important;
+}
+
+#student-switch-curriculum,
+.navbar,
+.header,
+.container,
+.container-fluid,
+.row {
+  max-width: 100% !important;
+}
+
+pre {
+  white-space: pre-wrap !important;
+  word-break: break-all !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+}

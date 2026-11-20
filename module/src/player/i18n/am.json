@@ -3,6 +3,7 @@
   "player.controlsLabel": "የማጫወቻ መቆጣጠሪያዎች",
   "player.play": "አጫውት",
   "player.back10": "10 ሰከንድ ወደ ኋላ መልስ",
+  "player.fwd10": "10 ሰከንድ ወደ ፊት ሂድ",
   "player.seekSlider": "የቪዲዮ ቦታ",
   "player.positionValueTextSeconds": "ቦታ {curSec} {secUnit} ከ {totalSec} {totalSecUnit}",
   "player.positionValueText": "ቦታ {curMin} {minUnit} {curSec} ከ {totalMin} {totalMinUnit}",
