@@ -3,8 +3,8 @@
 **Track 2: Accessible Learning Media + Career Gateway**  
 *ALX Accessibility Hackathon 2026*
 
-**Live demo:** [https://savanna-access-kit.onrender.com/](https://savanna-access-kit.onrender.com/) <br>
-**API docs:** [https://savanna-access-kit.onrender.com/docs](https://savanna-access-kit.onrender.com/docs) <br>
+**Live demo:** [https://savanna-access-kit.onrender.com/](https://savanna-access-kit-v1v8.onrender.com/) <br>
+**API docs:** [https://savanna-access-kit.onrender.com/docs](https://savanna-access-kit-v1v8.onrender.com/docs) <br>
 **Demo video:** [Watch demo video](https://drive.google.com/file/d/12bQ7HxxnMq4dv40FXNutQ9AY13sXFkba/view?usp=sharing)
 
 > The API runs on a free tier and may take up to a minute to wake up on first load.
@@ -54,18 +54,19 @@ In response to hackathon feedback and to deliver real-world impact across Ethiop
 
 ---
 
-### Option A: Live Hosted Application (Vercel)
+### Option A: Live Hosted Application (Render)
 Judges and evaluators can explore the hosted production deployment directly without local setup:
 
-- **Savanna Lesson Demo (with &lt;savanna-player&gt;):** [https://savanna-access-kit.vercel.app/savanna/pages/concept-with-navigation.html](https://savanna-access-kit.vercel.app/savanna/pages/concept-with-navigation.html)
-- **Savanna Access Kit Portal:** [https://savanna-access-kit.vercel.app/](https://savanna-access-kit.vercel.app/)
-- **Savanna Career Gateway:** [https://savanna-access-kit.vercel.app/savanna/pages/jobs.html](https://savanna-access-kit.vercel.app/savanna/pages/jobs.html)
-- **Portable Certificate Verifier (Open Badges 3.0):** [https://savanna-access-kit.vercel.app/verify/C-7](https://savanna-access-kit.vercel.app/verify/C-7)
-- **Audio Description Studio (Teacher Tool):** [https://savanna-access-kit.vercel.app/demo/audio-description-editor/index.html](https://savanna-access-kit.vercel.app/demo/audio-description-editor/index.html)
-- **Outside-Savanna Standalone Proof:** [https://savanna-access-kit.vercel.app/demo/blank.html](https://savanna-access-kit.vercel.app/demo/blank.html)
-- **WebVTT Caption Editor (Human Review Gate):** [https://savanna-access-kit.vercel.app/demo/caption-editor/index.html](https://savanna-access-kit.vercel.app/demo/caption-editor/index.html)
-- **Stable OpenAPI 3.1 Specification:** [https://savanna-access-kit.vercel.app/openapi.yaml](https://savanna-access-kit.vercel.app/openapi.yaml)
+- **Savanna Lesson Demo (with &lt;savanna-player&gt;):** [https://savanna-access-kit-v1v8.onrender.com/savanna/pages/concept-with-navigation.html](https://savanna-access-kit-v1v8.onrender.com/savanna/pages/concept-with-navigation.html)
+- **Savanna Access Kit Portal:** [https://savanna-access-kit-v1v8.onrender.com/](https://savanna-access-kit-v1v8.onrender.com/)
+- **Savanna Career Gateway:** [https://savanna-access-kit-v1v8.onrender.com/savanna/pages/jobs.html](https://savanna-access-kit-v1v8.onrender.com/savanna/pages/jobs.html)
+- **Portable Certificate Verifier (Open Badges 3.0):** [https://savanna-access-kit-v1v8.onrender.com/verify/C-7](https://savanna-access-kit-v1v8.onrender.com/verify/C-7)
+- **Audio Description Studio (Teacher Tool):** [https://savanna-access-kit-v1v8.onrender.com/demo/audio-description-editor/index.html](https://savanna-access-kit-v1v8.onrender.com/demo/audio-description-editor/index.html)
+- **Outside-Savanna Standalone Proof:** [https://savanna-access-kit-v1v8.onrender.com/demo/blank.html](https://savanna-access-kit-v1v8.onrender.com/demo/blank.html)
+- **WebVTT Caption Editor (Human Review Gate):** [https://savanna-access-kit-v1v8.onrender.com/demo/caption-editor/index.html](https://savanna-access-kit-v1v8.onrender.com/demo/caption-editor/index.html)
+- **Stable OpenAPI 3.1 Specification:** [https://savanna-access-kit-v1v8.onrender.com/openapi.yaml](https://savanna-access-kit-v1v8.onrender.com/openapi.yaml)
 
+- 
 ### Option B: Local Web Server (Zero Setup)
 ```bash
 node scripts/serve.mjs
