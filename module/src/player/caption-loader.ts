@@ -33,6 +33,10 @@ export function resolveCaptionUrl(options: ResolveCaptionUrlOptions): string {
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
       throw new Error(`Invalid caption URL protocol "${parsed.protocol}". Only HTTP and HTTPS are permitted.`);
     }
+    // When running hosted outside local mock (e.g. on Render), gracefully remap fixture localhost:4010 URLs to current host
+    if (parsed.origin === 'http://localhost:4010' && typeof window !== 'undefined' && window.location?.origin && !window.location.origin.includes('localhost:4010') && (!apiBase || !apiBase.includes('localhost:4010'))) {
+      return `${window.location.origin}${parsed.pathname}${parsed.search}`;
+    }
     return parsed.href;
   } catch (err: any) {
     if (err.message && err.message.includes('Only HTTP and HTTPS')) {

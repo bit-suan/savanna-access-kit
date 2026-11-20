@@ -1,6 +1,8 @@
 import { z } from "zod";
 
-const url = z.string().url();
+const url = z.string().refine((s) => s.startsWith("/") || z.string().url().safeParse(s).success, {
+  message: "Invalid URL or path",
+});
 export const Lang = z.enum(["en", "am"]);
 export type Lang = z.infer<typeof Lang>;
 

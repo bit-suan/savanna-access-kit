@@ -1658,6 +1658,9 @@ function resolveCaptionUrl(options) {
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
       throw new Error(`Invalid caption URL protocol "${parsed.protocol}". Only HTTP and HTTPS are permitted.`);
     }
+    if (parsed.origin === "http://localhost:4010" && typeof window !== "undefined" && window.location?.origin && !window.location.origin.includes("localhost:4010") && (!apiBase || !apiBase.includes("localhost:4010"))) {
+      return `${window.location.origin}${parsed.pathname}${parsed.search}`;
+    }
     return parsed.href;
   } catch (err) {
     if (err.message && err.message.includes("Only HTTP and HTTPS")) {
