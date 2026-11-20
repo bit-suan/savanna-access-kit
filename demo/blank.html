@@ -153,15 +153,6 @@
         </p>
 
         <div style="margin-top: 1rem;">
-          <!-- Extra Features: Access Label & Set up for me (Addendum 1.2) -->
-          <savanna-access-label
-            lesson="L-102"
-            api=""
-            api-key="pk_dev_local"
-          ></savanna-access-label>
-
-          <savanna-access-profiles></savanna-access-profiles>
-
           <savanna-player
             id="standalone-player"
             lesson="L-102"
@@ -171,16 +162,29 @@
           >
             <savanna-sign-window slot="overlay"></savanna-sign-window>
             <savanna-audio-description></savanna-audio-description>
-            <savanna-offline api="" api-key="pk_dev_local" lesson-id="L-102"></savanna-offline>
           </savanna-player>
 
-          <!-- Extra Feature: Lesson in a File (Addendum 1.2) -->
-          <div style="margin-top: 1rem;">
-            <savanna-share-button
-              lesson="L-102"
-              api=""
-              api-key="pk_dev_local"
-            ></savanna-share-button>
+          <!-- Innovation 1: Ethiopia 2G/3G Offline Pack Card (212 KB) -->
+          <div style="margin: 1.25rem 0; padding: 1.25rem; background: #fdfbf7; border: 1.5px solid #72548a; border-radius: 8px;">
+            <div style="margin-bottom: 0.85rem;">
+              <h3 style="margin: 0 0 0.35rem 0; font-size: 1.1rem; color: #4a2a62; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                <span>📦 ከመስመር ውጭ አውርድ · Ethiopia Offline Pack (L-102)</span>
+                <span style="font-size: 0.8rem; background: #4a2a62; color: #ffffff; padding: 2px 8px; border-radius: 12px; font-weight: normal;">212 KB · 2G/3G Ready</span>
+              </h3>
+              <p style="margin: 0; color: #334155; font-size: 0.9rem;">
+                Download once to study completely offline. Uses 99.4% less data than full video, caching audio and bilingual captions.
+              </p>
+            </div>
+            <savanna-offline api="" api-key="pk_dev_local" lesson-id="L-102"></savanna-offline>
+          </div>
+
+          <!-- Innovation 2: Teacher Audio Description Studio Link -->
+          <div style="margin: 1rem 0; padding: 1rem; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+            <div>
+              <strong style="color: #0369a1; font-size: 0.95rem;">🎙️ Audio Description Studio (Teacher Tool)</strong>
+              <p style="margin: 0.2rem 0 0 0; color: #475569; font-size: 0.85rem;">Author, time-align, and record voice descriptions for blind learners.</p>
+            </div>
+            <a href="audio-description-editor/index.html" style="background: #0284c7; color: #fff; padding: 0.5rem 1rem; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 0.85rem;">Open AD Studio →</a>
           </div>
         </div>
       </section>
@@ -206,6 +210,15 @@
             api-key="pk_dev_local"
             lang="am"
           ></savanna-credential>
+        </div>
+
+        <!-- Innovation 3: Offline Verifiable Credential Link -->
+        <div style="margin-top: 1rem; padding: 1rem; background: #fdf4ff; border: 1px solid #f0abfc; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+          <div>
+            <strong style="color: #86198f; font-size: 0.95rem;">🎓 Offline Verifiable Credential Verifier</strong>
+            <p style="margin: 0.2rem 0 0 0; color: #475569; font-size: 0.85rem;">Cryptographically verify student credentials with zero server contact (Open Badges 3.0 / Ed25519 did:web).</p>
+          </div>
+          <a href="../verify/C-7" style="background: #a21caf; color: #fff; padding: 0.5rem 1rem; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 0.85rem;">Verify Certificate C-7 →</a>
         </div>
       </section>
 
