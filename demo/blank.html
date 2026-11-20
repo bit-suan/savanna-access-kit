@@ -10,7 +10,7 @@
       Components self-register from a single module bundle, encapsulate styles via Shadow DOM,
       and communicate with the host via CustomEvents.
     -->
-    <script type="module" src="../dist/savanna-access.v1.js"></script>
+    <script type="module" src="../savanna/module/savanna-access.v1.js"></script>
     <style>
       :root {
         --savanna-accent: #0369a1;
@@ -156,7 +156,7 @@
           <!-- Extra Features: Access Label & Set up for me (Addendum 1.2) -->
           <savanna-access-label
             lesson="L-102"
-            api="http://localhost:4010"
+            api=""
             api-key="pk_dev_local"
           ></savanna-access-label>
 
@@ -166,19 +166,19 @@
             id="standalone-player"
             lesson="L-102"
             lang="am"
-            api="http://localhost:4010"
+            api=""
             api-key="pk_dev_local"
           >
             <savanna-sign-window slot="overlay"></savanna-sign-window>
             <savanna-audio-description></savanna-audio-description>
-            <savanna-offline api="http://localhost:4010" api-key="pk_dev_local" lesson-id="L-102"></savanna-offline>
+            <savanna-offline api="" api-key="pk_dev_local" lesson-id="L-102"></savanna-offline>
           </savanna-player>
 
           <!-- Extra Feature: Lesson in a File (Addendum 1.2) -->
           <div style="margin-top: 1rem;">
             <savanna-share-button
               lesson="L-102"
-              api="http://localhost:4010"
+              api=""
               api-key="pk_dev_local"
             ></savanna-share-button>
           </div>
@@ -195,14 +195,14 @@
         <div class="grid-cols" style="margin-top: 1rem;">
           <savanna-job-card
             job="J-9"
-            api="http://localhost:4010"
+            api=""
             api-key="pk_dev_local"
             lang="am"
           ></savanna-job-card>
 
           <savanna-credential
             id="C-7"
-            api="http://localhost:4010"
+            api=""
             api-key="pk_dev_local"
             lang="am"
           ></savanna-credential>

@@ -201,7 +201,16 @@ const server = http.createServer((req, res) => {
     }
   }
 
-  // 7. General static files
+  // 7. Fallback for /dist/ bundle requests to savanna/module
+  if (pathname === "/dist/savanna-access.v1.js" || pathname === "/dist/savanna-access.v1.js.map") {
+    const fallbackPath = path.join(root, "savanna/module", path.basename(pathname));
+    if (fs.existsSync(fallbackPath)) {
+      sendFile(req, res, fallbackPath);
+      return;
+    }
+  }
+
+  // 8. General static files
   let localFile = path.resolve(root, "." + pathname);
   if (fs.existsSync(localFile) && fs.statSync(localFile).isDirectory()) {
     localFile = path.join(localFile, "index.html");

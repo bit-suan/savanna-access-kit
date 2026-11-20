@@ -1,5 +1,7 @@
 node_modules
 dist
+!dist/savanna-access.v1.js
+!dist/savanna-access.v1.js.map
 .env
 .DS_Store
 *.log
