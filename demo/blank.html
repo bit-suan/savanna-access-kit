@@ -153,6 +153,15 @@
         </p>
 
         <div style="margin-top: 1rem;">
+          <!-- Extra Features: Access Label & Set up for me (Addendum 1.2) -->
+          <savanna-access-label
+            lesson="L-102"
+            api="http://localhost:4010"
+            api-key="pk_dev_local"
+          ></savanna-access-label>
+
+          <savanna-access-profiles></savanna-access-profiles>
+
           <savanna-player
             id="standalone-player"
             lesson="L-102"
@@ -164,6 +173,15 @@
             <savanna-audio-description></savanna-audio-description>
             <savanna-offline api="http://localhost:4010" api-key="pk_dev_local" lesson-id="L-102"></savanna-offline>
           </savanna-player>
+
+          <!-- Extra Feature: Lesson in a File (Addendum 1.2) -->
+          <div style="margin-top: 1rem;">
+            <savanna-share-button
+              lesson="L-102"
+              api="http://localhost:4010"
+              api-key="pk_dev_local"
+            ></savanna-share-button>
+          </div>
         </div>
       </section>
 

@@ -20,6 +20,8 @@ RUN pnpm install
 COPY api ./api
 COPY contracts ./contracts
 COPY docs ./docs
+COPY pipeline ./pipeline
+
 
 WORKDIR /app/api
 RUN pnpm db:generate

@@ -49,7 +49,10 @@ await esbuild.build({
     'offline': 'module/src/offline/offline.ts',
     'player': 'module/src/player/savanna-player.ts',
     'job-card': 'module/src/job-card/job-card.ts',
-    'credential': 'module/src/credential/credential.ts'
+    'credential': 'module/src/credential/credential.ts',
+    'access-label': 'module/src/access-label/access-label.ts',
+    'profiles': 'module/src/profiles/profiles.ts',
+    'share': 'module/src/share/share-button.ts'
   },
   bundle: true,
   format: 'esm',
