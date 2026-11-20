@@ -180,7 +180,10 @@ export class SavannaJobCard extends LitElement {
   }
 
   protected updated(changed: PropertyValues<this>): void {
-    if (changed.has("lang")) this.injectJsonLd();
+    if (changed.has("lang")) {
+      this.injectJsonLd();
+      this.audioRef.value?.load();
+    }
     if (
       !this.hasLoaded ||
       changed.has("job") ||
@@ -300,17 +303,39 @@ export class SavannaJobCard extends LitElement {
 
   private toggleAudio(): void {
     const audioEl = this.audioRef.value;
-    if (!audioEl) return;
     if (this.playing) {
-      audioEl.pause();
-      audioEl.currentTime = 0;
+      if (audioEl) {
+        audioEl.pause();
+        audioEl.currentTime = 0;
+      }
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
       this.playing = false;
       this.live = this.t("job.audioStopped");
       return;
     }
-    void audioEl.play();
-    this.playing = true;
-    this.live = this.t("job.audioPlaying");
+    const audioData = this.audio();
+    if (audioEl) {
+      audioEl.play().then(() => {
+        this.playing = true;
+        this.live = this.t("job.audioPlaying");
+      }).catch((err) => {
+        console.warn("[job-card] HTML5 audio playback failed, falling back to Web Speech API:", err);
+        if (typeof window !== "undefined" && window.speechSynthesis && audioData.transcript) {
+          window.speechSynthesis.cancel();
+          const u = new SpeechSynthesisUtterance(audioData.transcript);
+          u.lang = this.activeLang() === "am" ? "am-ET" : "en-US";
+          u.onend = this.onEnded;
+          u.onerror = this.onEnded;
+          this.playing = true;
+          this.live = this.t("job.audioPlaying");
+          window.speechSynthesis.speak(u);
+        } else {
+          this.playing = false;
+        }
+      });
+    }
   }
 
   private onEnded = () => {

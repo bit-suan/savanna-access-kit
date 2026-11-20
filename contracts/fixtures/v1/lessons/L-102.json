@@ -19,33 +19,46 @@
       "url": "http://localhost:4010/media/am.vtt"
     }
   ],
-  "sign": null,
-  "audioDescription": null,
+  "sign": {
+    "url": "http://localhost:4010/media/esl-placeholder.mp4",
+    "offsetMs": 0
+  },
+  "audioDescription": {
+    "audioUrl": "http://localhost:4010/media/ad.opus",
+    "vttUrl": "http://localhost:4010/media/ad.vtt",
+    "extended": true
+  },
   "transcript": {
     "url": "/v1/lessons/L-102/transcript"
   },
   "pack": {
     "manifestUrl": "/v1/lessons/L-102/pack",
-    "sizeBytes": 1800000
+    "sizeBytes": 212000
   },
   "access": {
     "captions": [
-      { "lang": "en", "status": "reviewed" },
-      { "lang": "am", "status": "reviewed" }
+      {
+        "lang": "en",
+        "status": "reviewed"
+      },
+      {
+        "lang": "am",
+        "status": "reviewed"
+      }
     ],
-    "sign": false,
+    "sign": true,
     "audioDescription": {
-      "recorded": false,
-      "text": false
+      "recorded": true,
+      "text": true
     },
     "offline": {
-      "sizeBytes": 1800000
+      "sizeBytes": 212000
     },
     "transcript": true,
-    "summary": true
+    "summary": false
   },
   "share": {
     "url": "/v1/lessons/L-102/share.html",
-    "sizeBytes": 1800000
+    "sizeBytes": 212000
   }
 }

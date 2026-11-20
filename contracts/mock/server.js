@@ -41,7 +41,11 @@ app.get("/v1/lessons/:id/pack.zip", (req, res) => {
 });
 
 app.get("/v1/*", (req, res) => {
-  const file = path.resolve(root, "." + req.path + ".json");
+  const lang = req.query.lang;
+  let file = lang ? path.resolve(root, "." + req.path + `.${lang}.json`) : "";
+  if (!file || !fs.existsSync(file)) {
+    file = path.resolve(root, "." + req.path + ".json");
+  }
   if (!file.startsWith(root + path.sep) || !fs.existsSync(file)) {
     return res
       .status(404)

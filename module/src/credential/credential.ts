@@ -287,6 +287,12 @@ export class SavannaCredential extends LitElement {
             href=${`${this.apiRoot()}/verify/${encodeURIComponent(this.credentialId())}/pdf?lang=${lang}`}
             >${this.t("cred.pdf")}</a
           >
+          <a
+            class="action"
+            href=${`${this.apiRoot()}/verify/${encodeURIComponent(this.credentialId())}.json`}
+            download=${`credential-${this.credentialId()}.json`}
+            >${this.t("cred.badge")}</a
+          >
         </div>
         <p role="status" aria-live="polite">${this.live}</p>
       </article>

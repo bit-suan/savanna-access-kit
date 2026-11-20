@@ -1,65 +1,124 @@
 <!doctype html>
 <html lang="am">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>የሳቫና የሥራ ዕድሎች</title>
-    <link rel="stylesheet" href="../assets/css/application_alx.css" media="all" />
-    <link rel="stylesheet" href="../assets/css/app.css" media="all" />
-    <style>
-      main {
-        max-width: 46rem;
-      }
-      savanna-job-card,
-      savanna-credential {
-        display: block;
-        margin-block: 1.5rem;
-      }
-      .skip-link {
-        position: absolute;
-        inset-inline-start: 0.5rem;
-        inset-block-start: -3rem;
-        padding: 0.5rem 1rem;
-        color: #fff;
-        background: #002b56;
-        border-radius: 0.25rem;
-        z-index: 10;
-      }
-      .skip-link:focus {
-        inset-block-start: 0.5rem;
-      }
-    </style>
-  </head>
-  <body class="bg-body-tertiary">
-    <a class="skip-link" href="#main">ወደ ዋና ይዘት ዝለል</a>
-    <main id="main" class="container-lg py-4">
-      <h1 class="h3 mb-2">የሥራ ዕድሎች</h1>
-      <p class="text-body-secondary">
-        ይህ የማሳያ ገጽ የሳቫና የሥራ መግቢያ ሞጁልን በአንድ የስክሪፕት መለያ ይጭናል። የሥራ ካርዶቹ እና የምስክር
-        ወረቀቱ የሚመጡት ከሳቫና ኤፒአይ ነው፤ ሁሉም ጽሑፍ በአማርኛ ነው።
-      </p>
 
-      <h2 class="h4 mt-4">የሥራ ዕድሎች</h2>
-      <savanna-job-card job="J-9" api="" api-key="pk_dev_local" lang="am"></savanna-job-card>
-      <savanna-job-card job="J-10" api="" api-key="pk_dev_local" lang="am"></savanna-job-card>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>የሳቫና የሥራ ዕድሎች</title>
+  <link rel="stylesheet" href="../assets/css/application_alx.css" media="all" />
+  <link rel="stylesheet" href="../assets/css/app.css" media="all" />
+  <style>
+    main {
+      max-width: 46rem;
+    }
 
-      <h2 class="h4 mt-4">የምስክር ወረቀት</h2>
-      <savanna-credential id="C-7" api="" api-key="pk_dev_local" lang="am"></savanna-credential>
+    savanna-job-card,
+    savanna-credential {
+      display: block;
+      margin-block: 1.5rem;
+    }
 
-      <p class="mt-4">
-        የሙከራ ሥራ መረጃ፦
-        <a href="data/jobs.json">data/jobs.json</a>
-      </p>
-    </main>
+    .skip-link {
+      position: absolute;
+      inset-inline-start: 0.5rem;
+      inset-block-start: -3rem;
+      padding: 0.5rem 1rem;
+      color: #fff;
+      background: #002b56;
+      border-radius: 0.25rem;
+      z-index: 10;
+    }
 
-    <script type="module" src="../module/savanna-career.v1.js"></script>
-    <script>
-      document.addEventListener("savanna:ready", function (event) {
-        console.log("ሞጁሉ ተጭኗል", event.detail);
+    .skip-link:focus {
+      inset-block-start: 0.5rem;
+    }
+  </style>
+</head>
+
+<body class="bg-body-tertiary">
+  <a class="skip-link" href="#main">ወደ ዋና ይዘት ዝለል · Skip to main content</a>
+  <main id="main" class="container-lg py-4">
+    <!-- Language & Navigation Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 p-3 bg-white border rounded shadow-sm flex-wrap gap-2">
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <span class="fw-bold" id="lang-label">🌐 ቋንቋ ምረጥ · Language:</span>
+        <div class="btn-group" role="group" aria-labelledby="lang-label">
+          <button type="button" id="btn-lang-am" class="btn btn-sm btn-primary fw-bold" onclick="setLanguage('am')">
+            🇪🇹 አማርኛ (Amharic)
+          </button>
+          <button type="button" id="btn-lang-en" class="btn btn-sm btn-outline-secondary" onclick="setLanguage('en')">
+            🇬🇧 English
+          </button>
+        </div>
+      </div>
+      <div>
+        <a href="concept-with-navigation.html" class="btn btn-sm btn-outline-primary">← ወደ ትምህርት ገጽ · To Lesson</a>
+      </div>
+    </div>
+
+    <h1 class="h3 mb-2" id="page-title">የሥራ ዕድሎች</h1>
+    <p class="text-body-secondary" id="page-subtitle">
+      ይህ የማሳያ ገጽ የሳቫና የሥራ መግቢያ ሞጁልን ይጭናል። የሥራ ካርዶቹ እና የምስክር ወረቀቱ በአማርኛ እና በእንግሊዝኛ የድምጽ ማጠቃለያዎችን ያካትታሉ።
+    </p>
+
+    <h2 class="h4 mt-4" id="heading-jobs">የሥራ ዕድሎች</h2>
+    <savanna-job-card id="job-card-1" job="J-9" api="" api-key="pk_dev_local" lang="am"></savanna-job-card>
+    <savanna-job-card id="job-card-2" job="J-10" api="" api-key="pk_dev_local" lang="am"></savanna-job-card>
+
+    <h2 class="h4 mt-4" id="heading-cred">የምስክር ወረቀት</h2>
+    <savanna-credential id="C-7" api="" api-key="pk_dev_local" lang="am"></savanna-credential>
+
+    <p class="mt-4">
+      የሙከራ ሥራ መረጃ፦
+      <a href="data/jobs.json">data/jobs.json</a>
+    </p>
+  </main>
+
+  <script type="module" src="../module/savanna-access.v1.js"></script>
+  <script>
+    function setLanguage(lang) {
+      document.documentElement.lang = lang;
+      document.querySelectorAll('savanna-job-card, savanna-credential').forEach(el => {
+        el.setAttribute('lang', lang);
+        el.lang = lang;
       });
-      document.addEventListener("savanna:error", function (event) {
-        console.log("ሞጁሉ ስህተት አሳይቷል", event.detail);
-      });
-    </script>
-  </body>
+      document.getElementById('btn-lang-am')?.classList.toggle('btn-primary', lang === 'am');
+      document.getElementById('btn-lang-am')?.classList.toggle('fw-bold', lang === 'am');
+      document.getElementById('btn-lang-am')?.classList.toggle('btn-outline-secondary', lang !== 'am');
+
+      document.getElementById('btn-lang-en')?.classList.toggle('btn-primary', lang === 'en');
+      document.getElementById('btn-lang-en')?.classList.toggle('fw-bold', lang === 'en');
+      document.getElementById('btn-lang-en')?.classList.toggle('btn-outline-secondary', lang !== 'en');
+
+      if (lang === 'en') {
+        document.getElementById('page-title').textContent = 'Career Gateway Opportunities';
+        document.getElementById('page-subtitle').textContent = 'Explore accessible job opportunities with synchronized audio summaries in English or Amharic, and portable Open Badges 3.0 credentials.';
+        document.getElementById('heading-jobs').textContent = 'Job Opportunities';
+        document.getElementById('heading-cred').textContent = 'Verifiable Certificate (Open Badges 3.0)';
+      } else {
+        document.getElementById('page-title').textContent = 'የሥራ ዕድሎች';
+        document.getElementById('page-subtitle').textContent = 'ይህ የማሳያ ገጽ የሳቫና የሥራ መግቢያ ሞጁልን ይጭናል። የሥራ ካርዶቹ እና የምስክር ወረቀቱ በአማርኛ እና በእንግሊዝኛ የድምጽ ማጠቃለያዎችን ያካትታሉ።';
+        document.getElementById('heading-jobs').textContent = 'የሥራ ዕድሎች';
+        document.getElementById('heading-cred').textContent = 'የምስክር ወረቀት';
+      }
+
+      window.dispatchEvent(new CustomEvent('savanna:lang-change', { detail: { lang } }));
+    }
+
+    // Check URL param or stored language on load
+    const urlParams = new URLSearchParams(window.location.search);
+    const initialLang = urlParams.get('lang');
+    if (initialLang === 'en' || initialLang === 'am') {
+      setLanguage(initialLang);
+    }
+
+    document.addEventListener("savanna:ready", function (event) {
+      console.log("ሞጁሉ ተጭኗል", event.detail);
+    });
+    document.addEventListener("savanna:error", function (event) {
+      console.log("ሞጁሉ ስህተት አሳይቷል", event.detail);
+    });
+  </script>
+</body>
+
 </html>

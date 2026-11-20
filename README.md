@@ -34,10 +34,46 @@ The Savanna Access Kit turns any lesson video into a fully accessible learning e
 
 ---
 
-## Run it
+## ✨ Innovations & Pitch Highlights
 
-### Option A: Docker Compose (One-Command Clean Run)
-Judges can launch the complete ecosystem with a single command (NFR-D1):
+In response to hackathon feedback and to deliver real-world impact across Ethiopia and Africa, the project includes:
+
+1. **Full 2-Minute Accessible Lesson (`L-102`):**
+   - Upgraded from short snippets to a complete **120-second (2:00)** learning media lesson.
+   - Synchronized bilingual captions (Amharic & English), timed Ethiopian Sign Language (ESL) interpreter video, and full audio descriptions.
+2. **Ethiopia Low-Data Mode (2G/3G) & 212 KB Offline Pack:**
+   - One-click **"📶 አነስተኛ ዳታ (2G/3G)"** mode reducing video bandwidth by **99.4%** via audio-first synchronized streaming.
+   - One-click **"Save for offline"** button (`<savanna-offline>`) directly downloading a **212 KB** offline pack (`L-102-2g-offline-pack.zip`) to device storage and browser cache for zero-data airplane-mode learning.
+3. **Portable Open Badges 3.0 / W3C Verifiable Credentials:**
+   - Any learner can download their verifiable credential (`/verify/C-7.json`).
+   - Employers verify authenticity and cryptographic signature offline via [`/verify/C-7`](https://savanna-access-kit.vercel.app/verify/C-7) with **zero ALX server contact** using Ed25519 `did:web` public keys.
+4. **Audio Description Studio for Teachers:**
+   - Dedicated in-browser authoring tool ([`/demo/audio-description-editor/`](https://savanna-access-kit.vercel.app/demo/audio-description-editor/index.html)) enabling educators to draft, time-align, preview, and record spoken audio descriptions for any video lesson.
+5. **Interactive Bilingual Transcript Search (English & Amharic):**
+   - Learners can press `T` or use the search bar to query lesson contents simultaneously in English and Amharic with instant time-jumping and live screen-reader feedback.
+
+---
+
+### Option A: Live Hosted Application (Vercel)
+Judges and evaluators can explore the hosted production deployment directly without local setup:
+
+- **Savanna Lesson Demo (with &lt;savanna-player&gt;):** [https://savanna-access-kit.vercel.app/savanna/pages/concept-with-navigation.html](https://savanna-access-kit.vercel.app/savanna/pages/concept-with-navigation.html)
+- **Savanna Access Kit Portal:** [https://savanna-access-kit.vercel.app/](https://savanna-access-kit.vercel.app/)
+- **Savanna Career Gateway:** [https://savanna-access-kit.vercel.app/savanna/pages/jobs.html](https://savanna-access-kit.vercel.app/savanna/pages/jobs.html)
+- **Portable Certificate Verifier (Open Badges 3.0):** [https://savanna-access-kit.vercel.app/verify/C-7](https://savanna-access-kit.vercel.app/verify/C-7)
+- **Audio Description Studio (Teacher Tool):** [https://savanna-access-kit.vercel.app/demo/audio-description-editor/index.html](https://savanna-access-kit.vercel.app/demo/audio-description-editor/index.html)
+- **Outside-Savanna Standalone Proof:** [https://savanna-access-kit.vercel.app/demo/blank.html](https://savanna-access-kit.vercel.app/demo/blank.html)
+- **WebVTT Caption Editor (Human Review Gate):** [https://savanna-access-kit.vercel.app/demo/caption-editor/index.html](https://savanna-access-kit.vercel.app/demo/caption-editor/index.html)
+- **Stable OpenAPI 3.1 Specification:** [https://savanna-access-kit.vercel.app/openapi.yaml](https://savanna-access-kit.vercel.app/openapi.yaml)
+
+### Option B: Local Web Server (Zero Setup)
+```bash
+node scripts/serve.mjs
+# Open http://localhost:8080/savanna/pages/concept-with-navigation.html
+```
+
+### Option C: Docker Compose (One-Command Clean Run)
+Judges can launch the complete ecosystem locally with a single command (NFR-D1):
 
 ```bash
 docker compose up
@@ -49,11 +85,13 @@ Once running, open:
 - **Savanna Access Kit Portal:** [http://localhost:8080/](http://localhost:8080/)
 - **Savanna Lesson Demo (with &lt;savanna-player&gt;):** [http://localhost:8080/savanna/pages/concept-with-navigation.html](http://localhost:8080/savanna/pages/concept-with-navigation.html)
 - **Savanna Career Gateway:** [http://localhost:8080/savanna/pages/jobs.html](http://localhost:8080/savanna/pages/jobs.html)
+- **Portable Certificate Verifier (Open Badges 3.0):** [http://localhost:8080/verify/C-7](http://localhost:8080/verify/C-7)
+- **Audio Description Studio (Teacher Tool):** [http://localhost:8080/demo/audio-description-editor/index.html](http://localhost:8080/demo/audio-description-editor/index.html)
 - **Outside-Savanna Standalone Proof:** [http://localhost:8080/demo/blank.html](http://localhost:8080/demo/blank.html)
 - **WebVTT Caption Editor (Human Review Gate):** [http://localhost:8080/demo/caption-editor/index.html](http://localhost:8080/demo/caption-editor/index.html)
-- **Interactive OpenAPI Documentation (Swagger UI):** [http://localhost:4010/docs](http://localhost:4010/docs)
+- **Stable OpenAPI Specification:** [http://localhost:8080/openapi.yaml](http://localhost:8080/openapi.yaml)
 
-### Option B: Local Development
+### Option D: Local Development
 ```bash
 corepack enable
 pnpm install
@@ -72,7 +110,7 @@ pnpm dev:api       # http://localhost:4010
 Add the unified bundle to any HTML page with **one script tag**:
 
 ```html
-<script type="module" src="https://cdn.example.org/savanna-access.v1.js"></script>
+<script type="module" src="https://savanna-access-kit.vercel.app/dist/savanna-access.v1.js"></script>
 ```
 
 ### Components & Attributes

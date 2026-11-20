@@ -8,6 +8,8 @@
     "node": ">=22"
   },
   "scripts": {
+    "start": "node scripts/serve.mjs",
+    "serve": "node scripts/serve.mjs",
     "mock": "node contracts/mock/server.js",
     "format": "prettier --write .",
     "test": "node --test pipeline/src/pack/*.test.mjs module/src/**/*.test.ts module/src/member2-a11y.test.ts",

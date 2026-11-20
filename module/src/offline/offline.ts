@@ -13,19 +13,13 @@ export class SavannaOffline extends LitElement{
  private statusIcon(){if(this.saved)return'✅';if(this.busy)return'⏳';if(this.manifest)return'📦';return'ℹ️';}
  private estimateTime(){if(this.progress<=0||!this.startTime)return'';const elapsed=Date.now()-this.startTime,rate=this.progress/elapsed,remaining=(100-this.progress)/rate;if(!isFinite(remaining)||remaining<0)return'';const sec=Math.ceil(remaining/1000);return sec<60?`~${sec}s remaining`:`~${Math.ceil(sec/60)}m remaining`;}
  connectedCallback(){super.connectedCallback();this.saved=read().savedLessons.includes(this.lessonId);void this.refresh();}
- updated(changed:Map<string,unknown>){if((changed.has('api')||changed.has('lessonId'))&&this.api&&this.lessonId&&!this.manifest)void this.refresh();}
- private url(){return `${this.api.replace(/\/$/,'')}/v1/lessons/${encodeURIComponent(this.lessonId)}/pack`;}
- private headers(){return this.apiKey?{'X-Savanna-Key':this.apiKey}:{};}
- private async refresh(){if(!this.api||!this.lessonId)return;try{const r=await fetch(this.url(),{headers:this.headers()});if(!r.ok)throw Error(r.status===404?'Pack is not published.':`Manifest request failed (${r.status}).`);this.manifest=await r.json();this.status=`Pack ready · ${this.size(this.manifest.sizeBytes||0)}`;}catch(e){this.status=(e as Error).message;}}
+ updated(changed:Map<string,unknown>){if((changed.has('api')||changed.has('lessonId'))&&this.lessonId&&!this.manifest)void this.refresh();}
+ private url(){const base=(this.api||'').replace(/\/$/,'');return `${base}/v1/lessons/${encodeURIComponent(this.lessonId)}/pack`;}
+ private headers(): Record<string, string>{return this.apiKey?{'X-Savanna-Key':this.apiKey}:{};}
+ private async refresh(){if(!this.lessonId)return;try{const r=await fetch(this.url(),{headers:this.headers()});if(!r.ok)throw Error(r.status===404?'Pack is not published.':`Manifest request failed (${r.status}).`);this.manifest=await r.json();this.status=`Pack ready · ${this.size(this.manifest.sizeBytes||0)}`;}catch(e){this.status=(e as Error).message;}}
  private size(n:number){return n<1024?`${n} B`:n<1048576?`${(n/1024).toFixed(1)} KB`:`${(n/1048576).toFixed(2)} MB`;}
  private async save(){
   if(this.busy||!this.manifest)return;
-  
-  // Check if Cache Storage API is available
-  if(typeof caches==='undefined'){
-    this.status='⚠️ Cache Storage is not available. Use http://localhost:3001 (not IP address) or enable HTTPS. Offline features require secure context.';
-    return;
-  }
   
   this.busy=true;this.progress=0;this.startTime=Date.now();
   try{
@@ -45,10 +39,28 @@ export class SavannaOffline extends LitElement{
       }
     }
     const blob=new Blob(chunks as BlobPart[],{type:'application/zip'});
+
+    // Trigger direct file download to user's device/disk
+    try {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${this.lessonId}-2g-offline-pack.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch(err) {
+      console.warn('[offline] Download trigger error:', err);
+    }
     
-    // Store in Cache Storage API
-    const cache=await caches.open(PREFIX+this.lessonId);
-    await cache.put(url,new Response(blob,{headers:{'Content-Type':'application/zip','Content-Length':String(blob.size)}}));
+    // Store in Cache Storage API if available
+    if(typeof caches!=='undefined'){
+      try {
+        const cache=await caches.open(PREFIX+this.lessonId);
+        await cache.put(url,new Response(blob,{headers:{'Content-Type':'application/zip','Content-Length':String(blob.size)}}));
+      } catch(e) {
+        console.warn('[offline] Cache save error:', e);
+      }
+    }
     
     // Store lesson ID in localStorage
     const p=read();
@@ -58,19 +70,15 @@ export class SavannaOffline extends LitElement{
     localStorage.setItem(KEY,JSON.stringify(a));
     
     this.saved=true;this.progress=100;
-    this.status=`✓ Saved offline · ${this.size(blob.size)}`;
+    this.status=`✓ Saved offline & downloaded · ${this.size(blob.size)}`;
   }catch(e){
     const errorMsg = (e as Error).message;
-    if(errorMsg.includes('caches') || errorMsg.includes('Cache')) {
-      this.status='❌ Cache Storage not available. Use http://localhost:3001 instead of IP address.';
-    } else {
-      this.status=`❌ ${errorMsg}`;
-    }
+    this.status=`❌ ${errorMsg}`;
   }finally{
     this.busy=false;this.startTime=0;
   }
  }
- private async remove(){
+ private async deleteOfflineCopy(){
   // Check if Cache Storage API is available
   if(typeof caches==='undefined'){
     // Cache API not available, but we can still clear localStorage
@@ -100,5 +108,5 @@ export class SavannaOffline extends LitElement{
   this.progress=0;
   this.status='Offline copy deleted from this device.';
  }
- render(){return html`<div class="row">${this.saved?html`<button @click=${this.remove} ?disabled=${this.busy} aria-label="Delete offline copy">🗑️ Delete offline copy</button>`:html`<button @click=${this.save} ?disabled=${this.busy||!this.manifest} aria-label="Save lesson for offline use">${this.busy?'⏸':'📥'} Save for offline${this.manifest&&!this.busy?html` <span class="size">(${this.size(this.manifest.sizeBytes||0)})</span>`:''}</button>`}<button @click=${this.refresh} ?disabled=${this.busy} aria-label="Refresh pack information">🔄 Refresh</button></div>${this.busy?html`<div class="progress-container"><progress max="100" .value=${this.progress} aria-label="Download progress ${this.progress} percent"></progress><p class="progress-text"><strong>${this.progress}%</strong> ${this.estimateTime()}</p></div>`:''}<p role="status" aria-live="polite" class="${this.saved?'success':this.busy?'info':''}"><span class="status-icon">${this.statusIcon()}</span> ${this.status}</p>`;}
+ render(){return html`<div class="row">${this.saved?html`<button @click=${this.deleteOfflineCopy} ?disabled=${this.busy} aria-label="Delete offline copy">🗑️ Delete offline copy</button>`:html`<button @click=${this.save} ?disabled=${this.busy||!this.manifest} aria-label="Save for offline">${this.busy?'⏸':'📥'} Save for offline${this.manifest&&!this.busy?html` <span class="size">(${this.size(this.manifest.sizeBytes||0)})</span>`:''}</button>`}<button @click=${this.refresh} ?disabled=${this.busy} aria-label="Refresh pack information">🔄 Refresh</button></div>${this.busy?html`<div class="progress-container"><progress max="100" .value=${this.progress} aria-label="Download progress ${this.progress} percent"></progress><p class="progress-text"><strong>${this.progress}%</strong> ${this.estimateTime()}</p></div>`:''}<p role="status" aria-live="polite" class="${this.saved?'success':this.busy?'info':''}"><span class="status-icon">${this.statusIcon()}</span> ${this.status}</p>`;}
 }

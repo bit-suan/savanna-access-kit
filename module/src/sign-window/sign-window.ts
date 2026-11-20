@@ -5,7 +5,7 @@ import {needsDriftCorrection,signTargetTime} from './sync.js';
 type Position={x:number;y:number;width:number;height:number;corner?:Corner};
 type Corner='nw'|'ne'|'se'|'sw';
 type Bounds={left:number;top:number;right:number;bottom:number};
-const KEY='savanna.prefs.v1',RATIO=16/9,HEADER=48,MIN_WIDTH=180,GUTTER=8,CONTROL_CLEARANCE=56;
+const KEY='savanna.prefs.v1',RATIO=16/9,HEADER=42,MIN_WIDTH=180,GUTTER=8,CONTROL_CLEARANCE=56;
 const DEFAULT:Position={x:8,y:8,width:320,height:320/RATIO+HEADER};
 
 function number(value:unknown,fallback:number){return typeof value==='number'&&Number.isFinite(value)?value:fallback;}
@@ -17,16 +17,27 @@ function save(position:Position,enabled?:boolean){try{const raw=JSON.parse(local
 @customElement('savanna-sign-window')
 export class SavannaSignWindow extends LitElement{
  static styles=css`
-  :host{position:absolute;z-index:20;display:block;width:var(--panel-width,320px);max-width:calc(100% - 16px);color:#fff;font:16px/1.4 var(--savanna-font,system-ui,sans-serif)}:host(:not([enabled])){width:auto;max-width:none}
-  section{position:relative;overflow:hidden;background:#16131a;border:1px solid #ffffff73;border-radius:var(--savanna-radius,8px);box-shadow:0 8px 24px #0009;transition:border-color .2s,box-shadow .2s}
-  section:has(header:focus-visible){border-color:var(--savanna-focus,#ffbf47);box-shadow:0 0 0 3px var(--savanna-focus,#ffbf47),0 8px 24px #0009}
-  section:has(header:active){border-color:#fff;box-shadow:0 0 0 2px #fff,0 8px 24px #0009}
-  header{display:flex;min-height:48px;align-items:center;justify-content:space-between;gap:8px;padding:0 6px 0 12px;background:#27202d;touch-action:none;cursor:grab;user-select:none}
-  header:active{cursor:grabbing;background:#372841}
-  header:focus-visible{outline:none} strong{font-size:14px}.actions{display:flex;gap:4px}button{display:grid;min-width:36px;min-height:36px;place-items:center;border:1px solid #ffffff66;border-radius:5px;background:#3d3049;color:#fff;font:inherit;cursor:pointer}button:hover{background:#594267}button:focus-visible{outline:3px solid var(--savanna-focus,#ffbf47);outline-offset:2px}.toggle{min-width:68px;padding:0 10px;font-size:13px;font-weight:700}.toggle[aria-pressed="true"]{background:var(--savanna-accent,#6e4a8e)}
-  video{display:block;width:100%;aspect-ratio:16/9;object-fit:contain;background:#08070a}.fallback{display:grid;min-height:180px;place-items:center;padding:16px;text-align:center;color:#f4eef8;background:#18151c}.loading{position:absolute;inset:48px 0 0;min-height:0;background:#18151ccc}.sr-only{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
-  .handle{position:absolute;z-index:1;width:20px;min-width:20px;height:20px;min-height:20px;padding:0;border:2px solid #fff;border-radius:4px;background:var(--savanna-accent,#6e4a8e);touch-action:none}.nw{top:4px;left:4px;cursor:nwse-resize}.ne{top:4px;right:4px;cursor:nesw-resize}.se{right:4px;bottom:4px;cursor:nwse-resize}.sw{bottom:4px;left:4px;cursor:nesw-resize}
-  @media (max-width:600px){:host{max-width:calc(100% - 12px)}header{min-height:44px;padding-left:10px}button{min-width:40px;min-height:40px}.toggle{min-width:72px}.handle{width:24px;min-width:24px;height:24px;min-height:24px}.fallback{min-height:120px}}
+  :host{position:absolute;z-index:20;display:block;width:var(--panel-width,320px);max-width:calc(100% - 16px);color:#fff;font:14px/1.4 var(--savanna-font,system-ui,sans-serif)}:host(:not([enabled])){width:auto;max-width:none}
+  section{position:relative;overflow:hidden;background:rgba(15,23,42,0.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.18);border-radius:10px;box-shadow:0 12px 36px -4px rgba(0,0,0,0.65),0 0 0 1px rgba(255,255,255,0.08);transition:border-color .2s,box-shadow .2s}
+  section:has(header:focus-visible){border-color:var(--savanna-focus,#ffbf47);box-shadow:0 0 0 3px var(--savanna-focus,#ffbf47),0 12px 36px rgba(0,0,0,0.7)}
+  section:has(header:active){border-color:#fff;box-shadow:0 0 0 2px #fff,0 12px 36px rgba(0,0,0,0.7)}
+  header{display:flex;min-height:42px;align-items:center;justify-content:space-between;gap:8px;padding:0 8px 0 12px;background:rgba(30,41,59,0.85);border-bottom:1px solid rgba(255,255,255,0.1);touch-action:none;cursor:grab;user-select:none}
+  header:active{cursor:grabbing;background:rgba(51,65,85,0.95)}
+  header:focus-visible{outline:none} strong{font-size:13px;font-weight:700;color:#f8fafc;letter-spacing:0.2px;white-space:nowrap}.actions{display:inline-flex;align-items:center;gap:3px}
+  .actions button{display:grid;min-width:26px;width:26px;min-height:26px;height:26px;place-items:center;border:1px solid rgba(255,255,255,0.18);border-radius:4px;background:rgba(255,255,255,0.08);color:#cbd5e1;font-size:11px;line-height:1;cursor:pointer;transition:all .15s ease}
+  .actions button:hover{background:rgba(255,255,255,0.22);color:#fff;border-color:rgba(255,255,255,0.35)}
+  .actions button:focus-visible{outline:2px solid var(--savanna-focus,#ffbf47);outline-offset:1px}
+  .toggle{min-width:48px;height:26px;min-height:26px;padding:0 8px;font-size:11px;font-weight:800;border-radius:4px;border:1px solid rgba(245,163,0,0.5);background:#f5a300;color:#0f172a;cursor:pointer;transition:all .15s ease}
+  .toggle:hover{background:#ffb733}
+  .toggle[aria-pressed="false"]{background:rgba(255,255,255,0.12);color:#94a3b8;border-color:rgba(255,255,255,0.2)}
+  video{display:block;width:100%;aspect-ratio:16/9;object-fit:contain;background:#000}.fallback{display:grid;min-height:180px;place-items:center;padding:16px;text-align:center;color:#f8fafc;background:#0f172a}.loading{position:absolute;inset:42px 0 0;min-height:0;background:rgba(15,23,42,0.85)}.sr-only{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+  .handle{position:absolute;z-index:2;touch-action:none}
+  .handle.nw,.handle.ne,.handle.sw{display:none !important}
+  .handle.se{display:block;right:3px;bottom:3px;width:18px;min-width:18px;height:18px;min-height:18px;padding:0;border:none;background:transparent;cursor:nwse-resize;opacity:0.6;transition:opacity .15s,transform .15s}
+  .handle.se::after{content:'';position:absolute;right:3px;bottom:3px;width:8px;height:8px;border-right:2px solid rgba(255,255,255,0.7);border-bottom:2px solid rgba(255,255,255,0.7);border-radius:1px}
+  .handle.se:hover{opacity:1;transform:scale(1.15)}
+  .handle.se:hover::after{border-color:#f5a300}
+  @media (max-width:600px){:host{max-width:calc(100% - 12px)}header{min-height:40px;padding-left:8px}.actions button{min-width:28px;min-height:28px}.toggle{min-width:52px}.fallback{min-height:120px}}
  `;
 
  @property() src='';
@@ -80,12 +91,13 @@ export class SavannaSignWindow extends LitElement{
  }
  firstUpdated(){
   this.video=this.renderRoot.querySelector('video')||undefined;
+  if(this.video) this.video.muted = true;
   if(!this.hasStoredPosition){const bounds=this.bounds();this.position={...this.position,x:bounds.right-this.position.width,y:bounds.top};}
   this.clamp();
  }
  updated(changed:Map<string,unknown>){
-  if(changed.has('src')){this.hasTrack=!!this.src;this.signUnavailable=false;this.loading=!!this.src;this.video=this.renderRoot.querySelector('video')||undefined;}
-  if(changed.has('enabled')){this.video=this.renderRoot.querySelector('video')||undefined;if(this.enabled)this.syncFromMain();}
+  if(changed.has('src')){this.hasTrack=!!this.src;this.signUnavailable=false;this.loading=!!this.src;this.video=this.renderRoot.querySelector('video')||undefined;if(this.video)this.video.muted=true;}
+  if(changed.has('enabled')){this.video=this.renderRoot.querySelector('video')||undefined;if(this.video)this.video.muted=true;if(this.enabled)this.syncFromMain();}
  }
  private bounds():Bounds{
   const parent=this.offsetParent as HTMLElement|null;
@@ -104,7 +116,7 @@ export class SavannaSignWindow extends LitElement{
   const height=width/RATIO+HEADER;
   return{width,height,x:Math.max(bounds.left,Math.min(position.x,bounds.right-width)),y:Math.max(bounds.top,Math.min(position.y,bounds.bottom-height)),corner:position.corner};
  }
- private apply(position:Position,persist=true){this.position=this.fit(position);if(persist)save(this.position);this.style.setProperty('--panel-width',this.position.width+'px');}
+ private apply(position:Position,persist=true){this.position=this.fit(position);if(persist)save(this.position);this.style.setProperty('--panel-width',this.position.width+'px');this.style.left=`${this.position.x}px`;this.style.top=`${this.position.y}px`;}
  private clamp=()=>this.apply(this.position);
  private language=(event:Event)=>{const lang=(event as CustomEvent<{lang?:string}>).detail?.lang;if(lang)this.lang=lang;};
  private sync=(event:Event)=>{
@@ -117,7 +129,9 @@ export class SavannaSignWindow extends LitElement{
  private syncTo(time:number,paused:boolean,rate:number){
   if(!this.enabled||!this.video||!this.hasTrack||this.signUnavailable)return;
   const target=signTargetTime(time,this.offsetMs);
-  if(needsDriftCorrection(this.video.currentTime,time,this.offsetMs))try{this.video.currentTime=target;}catch{}
+  const dur=this.video.duration;
+  const effectiveTarget=(dur&&dur>0&&target>=dur)?(target%dur):target;
+  if(needsDriftCorrection(this.video.currentTime,effectiveTarget,0))try{this.video.currentTime=effectiveTarget;}catch{}
   if(this.video.playbackRate!==rate)this.video.playbackRate=rate;
   if(paused||this.buffering)this.video.pause();else if(this.video.paused)void this.video.play().catch(()=>{});
  }
@@ -156,6 +170,6 @@ export class SavannaSignWindow extends LitElement{
   const keyboard=(e:KeyboardEvent)=>{if(!e.key.startsWith('Arrow'))return;e.preventDefault();const step=e.shiftKey?100:20;const horizontal=e.key==='ArrowRight'?step:e.key==='ArrowLeft'?-step:0;const right=horizontal;const down=e.key==='ArrowDown'?step:e.key==='ArrowUp'?-step:0;if(e.altKey)this.resizeBy(right,down); // Alt + arrow resizes.
   else this.move(right,down);};
   const toggle=html`<button class="toggle" type="button" aria-label="${label}: ${this.enabled?'on':'off'}" aria-pressed=${String(this.enabled)} @click=${this.toggle}>${this.enabled?'On':'Off'}</button>`;
-  return html`<p class="sr-only" role="status" aria-live="polite">${this.announcement}</p>${this.enabled?html`<section aria-label="${label} window"><header tabindex="0" role="group" aria-label="${label} window. Use arrow keys to move, Shift plus arrow keys for larger moves, and Alt plus arrow keys to resize." @keydown=${keyboard} aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Shift+ArrowUp Shift+ArrowDown Alt+ArrowUp Alt+ArrowDown" @pointerdown=${this.startDrag} @pointermove=${this.dragMove} @pointerup=${this.endDrag} @pointercancel=${this.endDrag}><strong>${label}</strong><span class="actions">${snaps}${toggle}</span></header>${this.hasTrack&&!this.signUnavailable?html`<video .src=${this.src} playsinline muted preload="metadata" aria-label="${label} interpreter video" @loadedmetadata=${this.signReady} @error=${this.signError}></video>${this.loading?html`<div class="fallback loading" role="status">Loading sign-language interpretation…</div>`:''}`:html`<div class="fallback" role="status">${fallback}</div>`}${handles}</section>`:toggle}`;
+  return html`<p class="sr-only" role="status" aria-live="polite">${this.announcement}</p>${this.enabled?html`<section aria-label="${label} window"><header tabindex="0" role="group" aria-label="${label} window. Use arrow keys to move, Shift plus arrow keys for larger moves, and Alt plus arrow keys to resize." @keydown=${keyboard} aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Shift+ArrowUp Shift+ArrowDown Alt+ArrowUp Alt+ArrowDown" @pointerdown=${this.startDrag} @pointermove=${this.dragMove} @pointerup=${this.endDrag} @pointercancel=${this.endDrag}><strong>${label}</strong><span class="actions">${snaps}${toggle}</span></header>${this.hasTrack&&!this.signUnavailable?html`<video .src=${this.src} playsinline muted preload="metadata" loop aria-label="${label} interpreter video" @loadedmetadata=${this.signReady} @error=${this.signError}></video>${this.loading?html`<div class="fallback loading" role="status">Loading sign-language interpretation…</div>`:''}`:html`<div class="fallback" role="status">${fallback}</div>`}${handles}</section>`:toggle}`;
  }
 }

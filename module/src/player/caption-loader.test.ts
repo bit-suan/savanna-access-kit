@@ -180,9 +180,9 @@ test('caption-loader: fetchCaptionTrack - safely strips credentials on cross-ori
   assert.equal(requestLog.length, 2);
 
   // Initial request carried the key
-  assert.equal(requestLog[0].headers['X-Savanna-Key'], 'my-secret-key');
+  assert.equal(requestLog[0]?.headers['X-Savanna-Key'], 'my-secret-key');
   // Redirected request MUST NOT carry the key
-  assert.equal(requestLog[1].headers['X-Savanna-Key'], undefined);
+  assert.equal(requestLog[1]?.headers['X-Savanna-Key'], undefined);
 });
 
 test('caption-loader: fetchCaptionTrack - handles authentication failure (401/403) and 404', async () => {
