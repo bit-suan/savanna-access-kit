@@ -688,6 +688,11 @@ var en_default = {
   "player.statusFullscreenOff": "Exited full screen",
   "player.statusTranscriptOpen": "Interactive transcript opened",
   "player.statusTranscriptClosed": "Interactive transcript closed",
+  "player.statusLoading": "Video loading...",
+  "player.statusReady": "Video ready to play",
+  "player.statusEnded": "Video playback ended",
+  "player.statusError": "Video playback error occurred",
+  "player.videoSettings": "Video settings",
   "player.captionsSettings": "Caption settings",
   "player.closeCaptionsSettings": "Close caption settings dialog",
   "player.captionsTrack": "Captions track",
@@ -816,6 +821,11 @@ var am_default = {
   "player.statusFullscreenOff": "\u12A8\u1219\u1209 \u121B\u12EB \u12C8\u1325\u1277\u120D",
   "player.statusTranscriptOpen": "\u1270\u130D\u1263\u122B\u12CA \u130D\u120D\u1260\u1323 \u133D\u1211\u134D \u1270\u12A8\u134D\u1277\u120D",
   "player.statusTranscriptClosed": "\u1270\u130D\u1263\u122B\u12CA \u130D\u120D\u1260\u1323 \u133D\u1211\u134D \u1270\u12D8\u130D\u1277\u120D",
+  "player.statusLoading": "\u126A\u12F2\u12EE\u12CD \u1260\u1218\u132B\u1295 \u120B\u12ED \u1290\u12CD...",
+  "player.statusReady": "\u126A\u12F2\u12EE\u12CD \u1208\u1218\u132B\u12C8\u1275 \u12DD\u130D\u1301 \u1290\u12CD",
+  "player.statusEnded": "\u12E8\u126A\u12F2\u12EE \u121B\u132B\u12C8\u1275 \u1270\u1320\u1293\u124B\u120D",
+  "player.statusError": "\u12E8\u126A\u12F2\u12EE \u1218\u120D\u1236 \u121B\u132B\u12C8\u1275 \u1235\u1205\u1270\u1275 \u1270\u12A8\u1235\u1277\u120D",
+  "player.videoSettings": "\u12E8\u126A\u12F2\u12EE \u1245\u1295\u1265\u122E\u127D",
   "player.captionsSettings": "\u12E8\u130D\u122D\u130C \u133D\u1211\u134D \u1245\u1295\u1265\u122E\u127D",
   "player.closeCaptionsSettings": "\u12E8\u130D\u122D\u130C \u133D\u1211\u134D \u1245\u1295\u1265\u122E\u127D \u1218\u1235\u12AE\u1275\u1295 \u12DD\u130B",
   "player.captionsTrack": "\u12E8\u130D\u122D\u130C \u133D\u1211\u134D \u124B\u1295\u124B",
@@ -1901,6 +1911,26 @@ var SavannaPlayer = class extends i4 {
         }
       }
     };
+    /**
+     * Accessible keyboard navigation inside playback speed menu.
+     */
+    this.handleSpeedMenuKeyDown = (e8) => {
+      const buttons = Array.from(this.shadowRoot?.querySelectorAll(".speed-opt-btn") || []);
+      const currentIndex = buttons.findIndex((b3) => b3 === this.shadowRoot?.activeElement);
+      if (e8.key === "ArrowDown" || e8.key === "ArrowRight") {
+        e8.preventDefault();
+        const nextIndex = (currentIndex + 1) % buttons.length;
+        buttons[nextIndex]?.focus();
+      } else if (e8.key === "ArrowUp" || e8.key === "ArrowLeft") {
+        e8.preventDefault();
+        const prevIndex = (currentIndex - 1 + buttons.length) % buttons.length;
+        buttons[prevIndex]?.focus();
+      } else if (e8.key === "Escape") {
+        e8.preventDefault();
+        this.isSpeedMenuOpen = false;
+        this.speedBtnElement?.focus();
+      }
+    };
     this.handleDocumentClick = (e8) => {
       if (this.isSpeedMenuOpen) {
         const path = e8.composedPath();
@@ -1914,6 +1944,7 @@ var SavannaPlayer = class extends i4 {
       if (event.key === "Escape") {
         if (this.isSpeedMenuOpen) {
           this.isSpeedMenuOpen = false;
+          this.speedBtnElement?.focus();
         }
         if (this.showHelpDialog || this.helpDialogElement?.open) {
           this.closeShortcutsDialog();
@@ -1942,6 +1973,7 @@ var SavannaPlayer = class extends i4 {
       if (this.isSpeedMenuOpen && event.key === "Escape") {
         event.preventDefault();
         this.isSpeedMenuOpen = false;
+        this.speedBtnElement?.focus();
         return;
       }
       if (this.showHelpDialog || this.helpDialogElement?.open) {
@@ -2100,6 +2132,18 @@ var SavannaPlayer = class extends i4 {
           }
           break;
         }
+      }
+    };
+    this.handleTablistKeyDown = (e8) => {
+      if (e8.key === "ArrowRight" || e8.key === "ArrowDown" || e8.key === "ArrowLeft" || e8.key === "ArrowUp") {
+        e8.preventDefault();
+        this.activePrefsTab = this.activePrefsTab === "general" ? "captions" : "general";
+        this.updateComplete.then(() => {
+          const activeTabBtn = this.shadowRoot?.querySelector(
+            this.activePrefsTab === "general" ? "#tab-general" : "#tab-captions"
+          );
+          activeTabBtn?.focus();
+        });
       }
     };
     this.handlePrefsDialogClose = () => {
@@ -2317,7 +2361,23 @@ var SavannaPlayer = class extends i4 {
     };
     // 6. Video encounters an error.
     this.handleError = () => {
+      this.announceStatus(this.t("player.statusError"));
       this.emitEvent("savanna:error");
+    };
+    // 7. Video completes playback.
+    this.handleEnded = () => {
+      this.isPlaying = false;
+      this.announceStatus(this.t("player.statusEnded"), "Ended \u23F9");
+      this.emitEvent("savanna:complete");
+    };
+    // 8. Video is ready to play.
+    this.handleCanPlay = () => {
+      this.announceStatus(this.t("player.statusReady"));
+      this.emitEvent("savanna:ready");
+    };
+    // 9. Video is buffering / waiting for data.
+    this.handleWaiting = () => {
+      this.announceStatus(this.t("player.statusLoading"));
     };
     this.toggleTranscript = () => {
       this.isTranscriptOpen = !this.isTranscriptOpen;
@@ -2703,6 +2763,15 @@ var SavannaPlayer = class extends i4 {
    */
   toggleSpeedMenu() {
     this.isSpeedMenuOpen = !this.isSpeedMenuOpen;
+    if (this.isSpeedMenuOpen) {
+      this.updateComplete.then(() => {
+        const popover = this.shadowRoot?.querySelector(".speed-popover");
+        const selectedBtn = popover?.querySelector(".is-selected") || popover?.querySelector(".speed-opt-btn");
+        selectedBtn?.focus();
+      });
+    } else {
+      this.speedBtnElement?.focus();
+    }
   }
   /**
    * Sets the playback rate, synchronizes media element, updates preferences and announces status (SRS FR-P9).
@@ -2716,6 +2785,7 @@ var SavannaPlayer = class extends i4 {
     this.saveAllPreferences();
     this.announceStatus(this.t("player.statusSpeed", { speed: rate }), `${rate}x`);
     this.isSpeedMenuOpen = false;
+    this.speedBtnElement?.focus();
   }
   /**
    * Computes human-readable wording for the position slider per SRS FR-P2.
@@ -3670,6 +3740,9 @@ var SavannaPlayer = class extends i4 {
             @pause=${this.handlePause}
             @seeking=${this.handleSeek}
             @timeupdate=${this.handleTimeUpdate}
+            @ended=${this.handleEnded}
+            @canplay=${this.handleCanPlay}
+            @waiting=${this.handleWaiting}
             @error=${this.handleError}
           >
             ${this.manifestCaptions.map(
@@ -3841,7 +3914,7 @@ var SavannaPlayer = class extends i4 {
               @click=${this.toggleSpeedMenu}
               aria-haspopup="menu"
               aria-expanded=${this.isSpeedMenuOpen ? "true" : "false"}
-              aria-label="${this.t("player.speed")}: ${this.playbackRate === 1 ? "1.0x" : this.playbackRate + "x"}"
+              aria-label="${this.t("player.speed")}, ${this.playbackRate === 1 ? "1.0x" : this.playbackRate + "x"}"
               title="${this.t("player.speed")}"
             >
               ${this.playbackRate === 1 ? "1.0x" : this.playbackRate + "x"}
@@ -3851,6 +3924,7 @@ var SavannaPlayer = class extends i4 {
                     class="speed-popover"
                     role="menu"
                     aria-label=${this.t("player.speed")}
+                    @keydown=${this.handleSpeedMenuKeyDown}
                   >
                     ${[0.5, 0.75, 1, 1.25, 1.5, 2].map(
       (rate) => b2`
@@ -3859,6 +3933,7 @@ var SavannaPlayer = class extends i4 {
                           role="menuitemradio"
                           class="speed-opt-btn ${this.playbackRate === rate ? "is-selected" : ""}"
                           aria-checked=${this.playbackRate === rate ? "true" : "false"}
+                          tabindex=${this.playbackRate === rate ? "0" : "-1"}
                           @click=${() => this.setPlaybackRate(rate)}
                         >
                           ${rate === 1 ? `1.0x (${this.t("player.speedNormal")})` : `${rate}x`}
@@ -3874,7 +3949,7 @@ var SavannaPlayer = class extends i4 {
             type="button"
             class="ctrl-btn btn-captions ${this.captionsShowing ? "active" : ""}"
             @click=${this.toggleCaptions}
-            aria-label="${this.t("player.captions")} CC"
+            aria-label="${this.t("player.captions")}: ${this.captionsShowing ? this.selectedCaptionLang === "am" ? "Amharic" : "English" : "Off"} CC"
             aria-pressed=${this.captionsShowing ? "true" : "false"}
             aria-expanded=${this.captionsShowing ? "true" : "false"}
             title="${this.t("player.captions")} (C)"
@@ -3884,15 +3959,15 @@ var SavannaPlayer = class extends i4 {
             ${this.captionsShowing ? b2`<span style="position: absolute; bottom: 4px; left: 10px; right: 10px; height: 2px; background: #e11d48; border-radius: 1px;"></span>` : ""}
           </button>
 
-          <!-- Preferences / Caption Settings Dialog Trigger (SRS FR-P3, FR-P3a, Contract C3/C4) -->
+          <!-- Preferences / Video Settings Dialog Trigger (SRS FR-P3, FR-P3a, Contract C3/C4) -->
           <button
             type="button"
             class="ctrl-btn btn-preferences btn-captions-settings ${this.showPreferencesDialog ? "active" : ""}"
             @click=${() => this.togglePreferences("general")}
-            aria-label=${this.t("player.captionsSettings")}
+            aria-label=${this.t("player.videoSettings")}
             aria-haspopup="dialog"
             aria-expanded=${this.showPreferencesDialog ? "true" : "false"}
-            title="${this.t("player.captionsSettings")} (P)"
+            title="${this.t("player.videoSettings")} (P)"
           >
             <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="3"></circle>
@@ -3924,7 +3999,7 @@ var SavannaPlayer = class extends i4 {
             type="button"
             class="ctrl-btn btn-sign ${!this.hasSignTrack ? "is-disabled" : ""} ${this.hasSignTrack && this.showSignWindow ? "active" : ""}"
             @click=${this.toggleSignWindow}
-            aria-label=${this.hasSignTrack ? `${this.t("player.sign")} ESL` : `${this.t("player.sign")} ESL ${this.t("player.notAvailableSuffix")}`.trim()}
+            aria-label="${this.t("player.sign")}: ${this.hasSignTrack ? this.showSignWindow ? "On" : "Off" : this.t("player.notAvailableSuffix")} ESL"
             aria-disabled=${!this.hasSignTrack ? "true" : "false"}
             aria-expanded=${this.hasSignTrack && this.showSignWindow ? "true" : "false"}
             aria-pressed=${this.hasSignTrack && this.showSignWindow ? "true" : "false"}
@@ -3938,7 +4013,7 @@ var SavannaPlayer = class extends i4 {
             type="button"
             class="ctrl-btn btn-ad ${!this.hasAdTrack ? "is-disabled" : ""} ${this.hasAdTrack && this.audioDescriptionEnabled ? "active" : ""}"
             @click=${this.toggleAudioDescription}
-            aria-label=${this.hasAdTrack ? `${this.t("player.audioDescription")} AD` : `${this.t("player.audioDescription")} AD ${this.t("player.notAvailableSuffix")}`.trim()}
+            aria-label="${this.t("player.audioDescription")}: ${this.hasAdTrack ? this.audioDescriptionEnabled ? "On" : "Off" : this.t("player.notAvailableSuffix")} AD"
             aria-disabled=${!this.hasAdTrack ? "true" : "false"}
             aria-expanded=${this.hasAdTrack && this.audioDescriptionEnabled ? "true" : "false"}
             aria-pressed=${this.hasAdTrack && this.audioDescriptionEnabled ? "true" : "false"}
@@ -3952,7 +4027,7 @@ var SavannaPlayer = class extends i4 {
             type="button"
             class="ctrl-btn btn-low-data ${this.lowData ? "active" : ""}"
             @click=${this.toggleLowDataMode}
-            aria-label="${this.lowData ? "2G Low-Data Mode" : "HD Video Mode"}"
+            aria-label="${this.lowData ? "2G Low-Data Audio Mode: On" : "HD Video Mode: On"}"
             aria-pressed=${this.lowData ? "true" : "false"}
             title="${this.activeLang === "am" ? "\u12DD\u1245\u1270\u129B \u12F3\u1273 \u121E\u12F5 (2G/3G)" : "Low-Data Mode (2G/3G)"}"
           >
@@ -4103,13 +4178,14 @@ var SavannaPlayer = class extends i4 {
           </div>
 
           <!-- Tab list -->
-          <div class="prefs-tab-bar" role="tablist" aria-label=${this.t("player.preferences")}>
+          <div class="prefs-tab-bar" role="tablist" aria-label=${this.t("player.preferences")} @keydown=${this.handleTablistKeyDown}>
             <button
               type="button"
               role="tab"
               id="tab-general"
               aria-controls="panel-general"
               aria-selected=${this.activePrefsTab === "general" ? "true" : "false"}
+              tabindex=${this.activePrefsTab === "general" ? "0" : "-1"}
               class="prefs-tab-btn ${this.activePrefsTab === "general" ? "is-active-tab" : ""}"
               @click=${() => {
       this.activePrefsTab = "general";
@@ -4123,6 +4199,7 @@ var SavannaPlayer = class extends i4 {
               id="tab-captions"
               aria-controls="panel-captions"
               aria-selected=${this.activePrefsTab === "captions" ? "true" : "false"}
+              tabindex=${this.activePrefsTab === "captions" ? "0" : "-1"}
               class="prefs-tab-btn ${this.activePrefsTab === "captions" ? "is-active-tab" : ""}"
               @click=${() => {
       this.activePrefsTab = "captions";
@@ -5576,6 +5653,9 @@ __decorateClass([
 __decorateClass([
   e5(".btn-preferences")
 ], SavannaPlayer.prototype, "prefsBtnElement", 2);
+__decorateClass([
+  e5(".btn-speed")
+], SavannaPlayer.prototype, "speedBtnElement", 2);
 SavannaPlayer = __decorateClass([
   t3("savanna-player")
 ], SavannaPlayer);

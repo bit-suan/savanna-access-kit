@@ -49,29 +49,52 @@
 
   <link rel="stylesheet" href="../assets/css/static-page.css" media="all" />
   <link rel="stylesheet" href="../../demo/savanna-patch.css" media="all" />
+  <style>
+    .skip-link {
+      position: absolute;
+      top: -4rem;
+      left: 1rem;
+      background: #002b56;
+      color: #ffffff !important;
+      padding: 0.75rem 1.25rem;
+      font-weight: 700;
+      font-size: 1rem;
+      z-index: 100000;
+      border-radius: 4px;
+      border: 2px solid #f5a300;
+      text-decoration: none;
+      transition: top 0.2s ease-in-out;
+    }
+    .skip-link:focus {
+      top: 1rem;
+      outline: 3px solid #f5a300;
+      outline-offset: 2px;
+    }
+  </style>
   <script type="module" src="../module/savanna-access.v1.js"></script>
   <script src="../../demo/savanna-patch.js" defer></script>
 </head>
 
 <body class="signed_in env_development notranslate" translate="no" data-theme-suffix="_alx">
+  <a class="skip-link" href="#curriculum_navigation_content">ወደ ዋና ይዘት ዝለል · Skip to main content</a>
   <!-- Google Tag Manager (noscript) -->
 
   <!-- End Google Tag Manager (noscript) -->
 
   <div data-react-class="header/Header" data-react-cache-id="header/Header-0">
-    <div class="header d-flex align-items-center position-fixed top-0 w-100" style="z-index: 1000">
+    <header role="banner" class="header d-flex align-items-center position-fixed top-0 w-100" style="z-index: 1000">
       <div class="header-left align-items-center d-flex position-fixed px-2" style="z-index: 2">
-        <div class="hamburger mb-0 p-2 color-primary" style="cursor: pointer; font-size: 24px">
+        <div class="hamburger mb-0 p-2 color-primary" style="cursor: pointer; font-size: 24px" role="button" aria-label="Toggle navigation menu" tabindex="0">
           <i class="fa-solid fa-fas fa-bars"></i>
         </div>
-        <a class="logo-container p-1" href="#" rel="noreferrer" target="">
+        <a class="logo-container p-1" href="#" rel="noreferrer" target="" aria-label="Savanna Home">
           <div class="logo mx-auto"
             style="background-image: url(&quot;../assets/img/holberton-logo-full-alx.png&quot;)"></div>
         </a>
       </div>
       <div class="header-right d-flex align-items-center flex-grow-1 justify-content-center" style="z-index: 1"></div>
-    </div>
-    <div class="sidebar navigation bg-white border-end position-fixed overflow-scroll bottom-0 start-0 expanded"
+    </header>
+    <nav role="navigation" aria-label="Curriculum navigation" class="sidebar navigation bg-white border-end position-fixed overflow-scroll bottom-0 start-0 expanded"
       id="sidebar" style="background-color: rgb(255, 255, 255); border-color: rgb(238, 238, 238)">
       <ul class="px-2">
         <li>
@@ -138,10 +161,10 @@
           </a>
         </li>
       </ul>
-    </div>
+    </nav>
   </div>
 
-  <main class="content" id="content">
+  <main class="content" id="content" role="main">
     <div id="layout-bars" style="padding-top: 63px">
       <div data-react-class="curriculums/CurrentCurriculumScrollBehavior"
         data-react-cache-id="curriculums/CurrentCurriculumScrollBehavior-0"></div>
@@ -450,6 +473,22 @@
         </div>
 
         <div class="flex-grow-1" id="curriculum_navigation_content">
+          <!-- Accessible Language Switcher Bar -->
+          <div class="d-flex justify-content-between align-items-center mb-3 p-3 bg-white border rounded shadow-sm flex-wrap gap-2" role="region" aria-label="Language selection · የቋንቋ ምርጫ">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <span class="fw-bold" id="concept-lang-label">🌐 ቋንቋ · Language:</span>
+              <div class="btn-group" role="group" aria-labelledby="concept-lang-label">
+                <button type="button" id="concept-btn-lang-am" class="btn btn-sm btn-primary fw-bold" aria-pressed="true" onclick="setLessonLanguage('am')">
+                  🇪🇹 አማርኛ (Amharic)
+                </button>
+                <button type="button" id="concept-btn-lang-en" class="btn btn-sm btn-outline-secondary" aria-pressed="false" onclick="setLessonLanguage('en')">
+                  🇬🇧 English
+                </button>
+              </div>
+            </div>
+            <div id="concept-lang-announcer" class="visually-hidden" role="status" aria-live="polite"></div>
+          </div>
+
           <h1 class="d-flex flex-column gap-2">
             <span>The Future of the VA Industry</span>
           </h1>
@@ -461,7 +500,7 @@
           <div class="gap formatted-content container-xl ms-0">
             <span>
               <div class="savanna-styles">
-                <p><img src="../assets/img/VA-Content-Banner.png" alt="VA-Content-Banner" loading="lazy" /></p>
+                <p><img src="../assets/img/VA-Content-Banner.png" alt="The Future of the Virtual Assistant Industry - Course Header Banner" loading="lazy" /></p>
                 <!-- Savanna Access Kit: Accessible Video Player & Adaptive Learning Media -->
                 <div class="savanna-player-mount" style="margin: 0.75rem 0 1.25rem 0;">
                   <savanna-player id="lesson-player" lesson="L-102" lang="am" api="" api-key="pk_dev_local">
@@ -506,7 +545,7 @@
                     Career Gateway →</a>
                 </div>
                 <figure>
-                  <img src="../assets/img/1lhlc1k4XRfVWDFTjczeaSoRpKlMY3dAX.png" alt="Evon afro" loading="lazy" />
+                  <img src="../assets/img/1lhlc1k4XRfVWDFTjczeaSoRpKlMY3dAX.png" alt="Professional Virtual Assistant collaborating remotely" loading="lazy" />
                 </figure>
                 <br />
                 <mark>The Virtual Assistant profession is not shrinking. It is evolving.</mark> As businesses become
@@ -516,9 +555,7 @@
                 <span class="bold-accent">what clients will value most</span> in the years ahead.
                 <div class="callout" style="margin: 16px 0px">
                   <div class="callout-content">
-                    <h>
-                      <p>⚠️ An Important Distinction</p>
-                    </h><br />
+                    <h3 style="font-size: 1.1rem; margin-bottom: 0.5rem; color: #b45309;">⚠️ An Important Distinction</h3>
                     Virtual Assistant can mean two different things. In some reports, a “virtual assistant” refers to
                     <span class="bold-accent">AI software assistants</span> such as chatbots, voice assistants, and
                     digital agents. In other contexts, it refers to
@@ -712,9 +749,7 @@
                 </ul>
                 <div class="callout" style="margin: 16px 0px">
                   <div class="callout-content">
-                    <h>
-                      <p>An encouraging truth</p>
-                    </h><br />
+                    <h3 style="font-size: 1.1rem; margin-bottom: 0.5rem; color: #15803d;">💡 An Encouraging Truth</h3>
                     <p>
                       You do not need to master everything immediately. What matters is building a strong foundation,
                       staying teachable, and growing with the industry as it changes.
@@ -1137,15 +1172,58 @@ alert(example);
   <script src="../assets/js/bootstrap.bundle.js"></script>
   <script src="../assets/js/static-page.js"></script>
   <script>
-    function setPlayerLang(lang) {
+    function setLessonLanguage(lang) {
+      document.documentElement.lang = lang;
       const player = document.getElementById('lesson-player');
       if (player) {
         player.setAttribute('lang', lang);
         player.lang = lang;
       }
-      document.getElementById('btn-lang-am')?.classList.toggle('active', lang === 'am');
-      document.getElementById('btn-lang-en')?.classList.toggle('active', lang === 'en');
+      const btnAm = document.getElementById('concept-btn-lang-am');
+      const btnEn = document.getElementById('concept-btn-lang-en');
+      if (btnAm && btnEn) {
+        btnAm.setAttribute('aria-pressed', String(lang === 'am'));
+        btnAm.classList.toggle('btn-primary', lang === 'am');
+        btnAm.classList.toggle('fw-bold', lang === 'am');
+        btnAm.classList.toggle('btn-outline-secondary', lang !== 'am');
+
+        btnEn.setAttribute('aria-pressed', String(lang === 'en'));
+        btnEn.classList.toggle('btn-primary', lang === 'en');
+        btnEn.classList.toggle('fw-bold', lang === 'en');
+        btnEn.classList.toggle('btn-outline-secondary', lang !== 'en');
+      }
+
+      const announcer = document.getElementById('concept-lang-announcer');
+      if (announcer) {
+        announcer.textContent = lang === 'am' ? 'የገጹ ቋንቋ ወደ አማርኛ ተቀይሯል' : 'Language switched to English';
+      }
+
       window.dispatchEvent(new CustomEvent('savanna:lang-change', { detail: { lang } }));
+    }
+
+    // Sync when player dispatches lang-change
+    window.addEventListener('savanna:lang-change', (e) => {
+      const lang = e.detail?.lang;
+      if (lang === 'am' || lang === 'en') {
+        document.documentElement.lang = lang;
+        const btnAm = document.getElementById('concept-btn-lang-am');
+        const btnEn = document.getElementById('concept-btn-lang-en');
+        if (btnAm && btnEn) {
+          btnAm.setAttribute('aria-pressed', String(lang === 'am'));
+          btnAm.classList.toggle('btn-primary', lang === 'am');
+          btnAm.classList.toggle('fw-bold', lang === 'am');
+          btnAm.classList.toggle('btn-outline-secondary', lang !== 'am');
+
+          btnEn.setAttribute('aria-pressed', String(lang === 'en'));
+          btnEn.classList.toggle('btn-primary', lang === 'en');
+          btnEn.classList.toggle('fw-bold', lang === 'en');
+          btnEn.classList.toggle('btn-outline-secondary', lang !== 'en');
+        }
+      }
+    });
+
+    function setPlayerLang(lang) {
+      setLessonLanguage(lang);
     }
     function togglePlayerLowData() {
       const player = document.getElementById('lesson-player');
