@@ -302,6 +302,9 @@ export class SavannaPlayer extends LitElement {
   @query('.btn-preferences')
   private prefsBtnElement!: HTMLButtonElement | null;
 
+  @query('.btn-speed')
+  private speedBtnElement!: HTMLButtonElement | null;
+
   // Expose the real browser media element (Contract C2).
   get media(): HTMLMediaElement {
     return this.videoElement;
@@ -1645,7 +1648,38 @@ export class SavannaPlayer extends LitElement {
    */
   public toggleSpeedMenu(): void {
     this.isSpeedMenuOpen = !this.isSpeedMenuOpen;
+    if (this.isSpeedMenuOpen) {
+      this.updateComplete.then(() => {
+        const popover = this.shadowRoot?.querySelector('.speed-popover') as HTMLElement | null;
+        const selectedBtn = (popover?.querySelector('.is-selected') || popover?.querySelector('.speed-opt-btn')) as HTMLElement | null;
+        selectedBtn?.focus();
+      });
+    } else {
+      this.speedBtnElement?.focus();
+    }
   }
+
+  /**
+   * Accessible keyboard navigation inside playback speed menu.
+   */
+  private handleSpeedMenuKeyDown = (e: KeyboardEvent): void => {
+    const buttons = Array.from(this.shadowRoot?.querySelectorAll('.speed-opt-btn') || []) as HTMLElement[];
+    const currentIndex = buttons.findIndex((b) => b === this.shadowRoot?.activeElement);
+
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      const nextIndex = (currentIndex + 1) % buttons.length;
+      buttons[nextIndex]?.focus();
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      const prevIndex = (currentIndex - 1 + buttons.length) % buttons.length;
+      buttons[prevIndex]?.focus();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      this.isSpeedMenuOpen = false;
+      this.speedBtnElement?.focus();
+    }
+  };
 
   /**
    * Sets the playback rate, synchronizes media element, updates preferences and announces status (SRS FR-P9).
@@ -1659,6 +1693,7 @@ export class SavannaPlayer extends LitElement {
     this.saveAllPreferences();
     this.announceStatus(this.t('player.statusSpeed', { speed: rate }), `${rate}x`);
     this.isSpeedMenuOpen = false;
+    this.speedBtnElement?.focus();
   }
 
   private handleDocumentClick = (e: MouseEvent): void => {
@@ -1675,6 +1710,7 @@ export class SavannaPlayer extends LitElement {
     if (event.key === 'Escape') {
       if (this.isSpeedMenuOpen) {
         this.isSpeedMenuOpen = false;
+        this.speedBtnElement?.focus();
       }
       if (this.showHelpDialog || this.helpDialogElement?.open) {
         this.closeShortcutsDialog();
@@ -2022,6 +2058,7 @@ export class SavannaPlayer extends LitElement {
     if (this.isSpeedMenuOpen && event.key === 'Escape') {
       event.preventDefault();
       this.isSpeedMenuOpen = false;
+      this.speedBtnElement?.focus();
       return;
     }
 
@@ -2362,6 +2399,19 @@ export class SavannaPlayer extends LitElement {
   public toggleCaptionsSettings(): void {
     this.togglePreferences('captions');
   }
+
+  private handleTablistKeyDown = (e: KeyboardEvent): void => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      this.activePrefsTab = this.activePrefsTab === 'general' ? 'captions' : 'general';
+      this.updateComplete.then(() => {
+        const activeTabBtn = this.shadowRoot?.querySelector(
+          this.activePrefsTab === 'general' ? '#tab-general' : '#tab-captions'
+        ) as HTMLElement | null;
+        activeTabBtn?.focus();
+      });
+    }
+  };
 
   private handlePrefsDialogClose = (): void => {
     this.showPreferencesDialog = false;
@@ -2814,7 +2864,26 @@ export class SavannaPlayer extends LitElement {
 
   // 6. Video encounters an error.
   private handleError = (): void => {
+    this.announceStatus(this.t('player.statusError'));
     this.emitEvent('savanna:error');
+  };
+
+  // 7. Video completes playback.
+  private handleEnded = (): void => {
+    this.isPlaying = false;
+    this.announceStatus(this.t('player.statusEnded'), 'Ended ⏹');
+    this.emitEvent('savanna:complete');
+  };
+
+  // 8. Video is ready to play.
+  private handleCanPlay = (): void => {
+    this.announceStatus(this.t('player.statusReady'));
+    this.emitEvent('savanna:ready');
+  };
+
+  // 9. Video is buffering / waiting for data.
+  private handleWaiting = (): void => {
+    this.announceStatus(this.t('player.statusLoading'));
   };
 
   // Runs after Lit completes the first render.
@@ -3305,6 +3374,9 @@ export class SavannaPlayer extends LitElement {
             @pause=${this.handlePause}
             @seeking=${this.handleSeek}
             @timeupdate=${this.handleTimeUpdate}
+            @ended=${this.handleEnded}
+            @canplay=${this.handleCanPlay}
+            @waiting=${this.handleWaiting}
             @error=${this.handleError}
           >
             ${this.manifestCaptions.map(
@@ -3484,7 +3556,7 @@ export class SavannaPlayer extends LitElement {
               @click=${this.toggleSpeedMenu}
               aria-haspopup="menu"
               aria-expanded=${this.isSpeedMenuOpen ? 'true' : 'false'}
-              aria-label="${this.t('player.speed')}: ${this.playbackRate === 1 ? '1.0x' : this.playbackRate + 'x'}"
+              aria-label="${this.t('player.speed')}, ${this.playbackRate === 1 ? '1.0x' : this.playbackRate + 'x'}"
               title="${this.t('player.speed')}"
             >
               ${this.playbackRate === 1 ? '1.0x' : this.playbackRate + 'x'}
@@ -3495,6 +3567,7 @@ export class SavannaPlayer extends LitElement {
                     class="speed-popover"
                     role="menu"
                     aria-label=${this.t('player.speed')}
+                    @keydown=${this.handleSpeedMenuKeyDown}
                   >
                     ${[0.5, 0.75, 1, 1.25, 1.5, 2].map(
           (rate) => html`
@@ -3503,6 +3576,7 @@ export class SavannaPlayer extends LitElement {
                           role="menuitemradio"
                           class="speed-opt-btn ${this.playbackRate === rate ? 'is-selected' : ''}"
                           aria-checked=${this.playbackRate === rate ? 'true' : 'false'}
+                          tabindex=${this.playbackRate === rate ? '0' : '-1'}
                           @click=${() => this.setPlaybackRate(rate)}
                         >
                           ${rate === 1 ? `1.0x (${this.t('player.speedNormal')})` : `${rate}x`}
@@ -3519,7 +3593,7 @@ export class SavannaPlayer extends LitElement {
             type="button"
             class="ctrl-btn btn-captions ${this.captionsShowing ? 'active' : ''}"
             @click=${this.toggleCaptions}
-            aria-label="${this.t('player.captions')} CC"
+            aria-label="${this.t('player.captions')}: ${this.captionsShowing ? (this.selectedCaptionLang === 'am' ? 'Amharic' : 'English') : 'Off'} CC"
             aria-pressed=${this.captionsShowing ? 'true' : 'false'}
             aria-expanded=${this.captionsShowing ? 'true' : 'false'}
             title="${this.t('player.captions')} (C)"
@@ -3529,15 +3603,15 @@ export class SavannaPlayer extends LitElement {
             ${this.captionsShowing ? html`<span style="position: absolute; bottom: 4px; left: 10px; right: 10px; height: 2px; background: #e11d48; border-radius: 1px;"></span>` : ''}
           </button>
 
-          <!-- Preferences / Caption Settings Dialog Trigger (SRS FR-P3, FR-P3a, Contract C3/C4) -->
+          <!-- Preferences / Video Settings Dialog Trigger (SRS FR-P3, FR-P3a, Contract C3/C4) -->
           <button
             type="button"
             class="ctrl-btn btn-preferences btn-captions-settings ${this.showPreferencesDialog ? 'active' : ''}"
             @click=${() => this.togglePreferences('general')}
-            aria-label=${this.t('player.captionsSettings')}
+            aria-label=${this.t('player.videoSettings')}
             aria-haspopup="dialog"
             aria-expanded=${this.showPreferencesDialog ? 'true' : 'false'}
-            title="${this.t('player.captionsSettings')} (P)"
+            title="${this.t('player.videoSettings')} (P)"
           >
             <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="3"></circle>
@@ -3569,9 +3643,7 @@ export class SavannaPlayer extends LitElement {
             type="button"
             class="ctrl-btn btn-sign ${!this.hasSignTrack ? 'is-disabled' : ''} ${this.hasSignTrack && this.showSignWindow ? 'active' : ''}"
             @click=${this.toggleSignWindow}
-            aria-label=${this.hasSignTrack
-        ? `${this.t('player.sign')} ESL`
-        : `${this.t('player.sign')} ESL ${this.t('player.notAvailableSuffix')}`.trim()}
+            aria-label="${this.t('player.sign')}: ${this.hasSignTrack ? (this.showSignWindow ? 'On' : 'Off') : this.t('player.notAvailableSuffix')} ESL"
             aria-disabled=${!this.hasSignTrack ? 'true' : 'false'}
             aria-expanded=${this.hasSignTrack && this.showSignWindow ? 'true' : 'false'}
             aria-pressed=${this.hasSignTrack && this.showSignWindow ? 'true' : 'false'}
@@ -3585,9 +3657,7 @@ export class SavannaPlayer extends LitElement {
             type="button"
             class="ctrl-btn btn-ad ${!this.hasAdTrack ? 'is-disabled' : ''} ${this.hasAdTrack && this.audioDescriptionEnabled ? 'active' : ''}"
             @click=${this.toggleAudioDescription}
-            aria-label=${this.hasAdTrack
-        ? `${this.t('player.audioDescription')} AD`
-        : `${this.t('player.audioDescription')} AD ${this.t('player.notAvailableSuffix')}`.trim()}
+            aria-label="${this.t('player.audioDescription')}: ${this.hasAdTrack ? (this.audioDescriptionEnabled ? 'On' : 'Off') : this.t('player.notAvailableSuffix')} AD"
             aria-disabled=${!this.hasAdTrack ? 'true' : 'false'}
             aria-expanded=${this.hasAdTrack && this.audioDescriptionEnabled ? 'true' : 'false'}
             aria-pressed=${this.hasAdTrack && this.audioDescriptionEnabled ? 'true' : 'false'}
@@ -3601,7 +3671,7 @@ export class SavannaPlayer extends LitElement {
             type="button"
             class="ctrl-btn btn-low-data ${this.lowData ? 'active' : ''}"
             @click=${this.toggleLowDataMode}
-            aria-label="${this.lowData ? '2G Low-Data Mode' : 'HD Video Mode'}"
+            aria-label="${this.lowData ? '2G Low-Data Audio Mode: On' : 'HD Video Mode: On'}"
             aria-pressed=${this.lowData ? 'true' : 'false'}
             title="${this.activeLang === 'am' ? 'ዝቅተኛ ዳታ ሞድ (2G/3G)' : 'Low-Data Mode (2G/3G)'}"
           >
@@ -3757,13 +3827,14 @@ export class SavannaPlayer extends LitElement {
           </div>
 
           <!-- Tab list -->
-          <div class="prefs-tab-bar" role="tablist" aria-label=${this.t('player.preferences')}>
+          <div class="prefs-tab-bar" role="tablist" aria-label=${this.t('player.preferences')} @keydown=${this.handleTablistKeyDown}>
             <button
               type="button"
               role="tab"
               id="tab-general"
               aria-controls="panel-general"
               aria-selected=${this.activePrefsTab === 'general' ? 'true' : 'false'}
+              tabindex=${this.activePrefsTab === 'general' ? '0' : '-1'}
               class="prefs-tab-btn ${this.activePrefsTab === 'general' ? 'is-active-tab' : ''}"
               @click=${() => { this.activePrefsTab = 'general'; }}
             >
@@ -3775,6 +3846,7 @@ export class SavannaPlayer extends LitElement {
               id="tab-captions"
               aria-controls="panel-captions"
               aria-selected=${this.activePrefsTab === 'captions' ? 'true' : 'false'}
+              tabindex=${this.activePrefsTab === 'captions' ? '0' : '-1'}
               class="prefs-tab-btn ${this.activePrefsTab === 'captions' ? 'is-active-tab' : ''}"
               @click=${() => { this.activePrefsTab = 'captions'; }}
             >

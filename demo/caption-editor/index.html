@@ -270,11 +270,32 @@
       margin-top: 1rem;
       font-weight: 600;
     }
+    .skip-link {
+      position: absolute;
+      top: -4rem;
+      left: 1rem;
+      background: var(--primary-color);
+      color: #ffffff !important;
+      padding: 0.75rem 1.25rem;
+      font-weight: 700;
+      font-size: 1rem;
+      z-index: 100000;
+      border-radius: 4px;
+      border: 2px solid #f59e0b;
+      text-decoration: none;
+      transition: top 0.2s ease-in-out;
+    }
+    .skip-link:focus {
+      top: 1rem;
+      outline: 3px solid #f59e0b;
+      outline-offset: 2px;
+    }
   </style>
 </head>
 <body>
+  <a class="skip-link" href="#main">Skip to main content</a>
   <div class="container">
-    <header>
+    <header role="banner">
       <div>
         <h1>Savanna Caption Reviewer &amp; Editor</h1>
         <p class="subtitle" id="editor-sub">Validate WebVTT captions against SRS limits: 2 lines max, ~32 chars/line, 1–7s duration.</p>
@@ -286,7 +307,7 @@
       </div>
     </header>
 
-    <main>
+    <main id="main" role="main">
       <section class="card rules-card" aria-labelledby="rules-title">
         <h2 id="rules-title">📋 WebVTT Review Gate Requirements (FR-A2 / FR-A3)</h2>
         <ul>

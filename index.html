@@ -95,11 +95,32 @@
         color: #334155;
         margin-bottom: 0.75rem;
       }
+      .skip-link {
+        position: absolute;
+        top: -4rem;
+        left: 1rem;
+        background: var(--primary);
+        color: #ffffff !important;
+        padding: 0.75rem 1.25rem;
+        font-weight: 700;
+        font-size: 1rem;
+        z-index: 100000;
+        border-radius: 4px;
+        border: 2px solid var(--accent);
+        text-decoration: none;
+        transition: top 0.2s ease-in-out;
+      }
+      .skip-link:focus {
+        top: 1rem;
+        outline: 3px solid var(--accent);
+        outline-offset: 2px;
+      }
     </style>
   </head>
   <body>
-    <main>
-      <header>
+    <a class="skip-link" href="#main">Skip to main content</a>
+    <main id="main" role="main">
+      <header role="banner">
         <span class="badge">ALX Accessibility Hackathon 2026 · Track 2</span>
         <h1>Savanna Access Kit</h1>
         <p class="subtitle">Accessible Learning Media &amp; Career Gateway (Drop-in Web Components, REST API &amp; Content Pipeline)</p>
