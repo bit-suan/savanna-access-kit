@@ -203,7 +203,9 @@ const server = http.createServer((req, res) => {
       "Content-Disposition": `attachment; filename="certificate-${id}.pdf"`,
       "Content-Length": pdfBuffer.length,
       "Access-Control-Allow-Origin": "*",
-      "Cache-Control": "public, max-age=3600"
+      "Cache-Control": "no-cache, no-store, must-revalidate, proxy-revalidate",
+      "Pragma": "no-cache",
+      "Expires": "0"
     });
     res.end(pdfBuffer);
     return;
