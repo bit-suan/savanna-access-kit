@@ -5979,9 +5979,9 @@ SavannaSignWindow = __decorateClass([
 var KEY2 = "savanna.prefs.v1";
 function prefs() {
   try {
-    return { enabled: false, extended: false, mode: "audio", ...JSON.parse(localStorage.getItem(KEY2) || "{}").ad };
+    return { enabled: false, extended: false, mode: "speech", ...JSON.parse(localStorage.getItem(KEY2) || "{}").ad };
   } catch {
-    return { enabled: false, extended: false, mode: "audio" };
+    return { enabled: false, extended: false, mode: "speech" };
   }
 }
 var SavannaAudioDescription = class extends i4 {
@@ -5995,15 +5995,38 @@ var SavannaAudioDescription = class extends i4 {
     this.cues = [];
     this.active = "";
     this.wasPlaying = false;
-    this.last = -1;
+    this.lastTime = -1;
+    this.lastSpokenCue = -1;
     this.time = (e8) => {
       const d3 = e8.detail;
       if (!d3) return;
-      if (this.p.enabled && this.p.mode === "text") {
+      if (d3.paused) {
+        if (typeof window !== "undefined" && window.speechSynthesis) try {
+          window.speechSynthesis.cancel();
+        } catch {
+        }
+        if (this.audio && !this.audio.paused) this.audio.pause();
+        return;
+      }
+      if (this.lastTime >= 0 && Math.abs(d3.time - this.lastTime) > 1.5) {
+        if (typeof window !== "undefined" && window.speechSynthesis) try {
+          window.speechSynthesis.cancel();
+        } catch {
+        }
+        this.lastSpokenCue = -1;
+      }
+      this.lastTime = d3.time;
+      if (this.p.enabled && (this.p.mode === "text" || this.p.mode === "speech")) {
         const c5 = this.cues.find((x2) => d3.time >= x2.start && d3.time < x2.end);
-        if (c5 && c5.text !== this.active) {
-          this.active = c5.text;
-          this.status = c5.text;
+        if (c5) {
+          if (c5.text !== this.active) {
+            this.active = c5.text;
+            this.status = c5.text;
+          }
+          if (this.p.mode === "speech" && this.lastSpokenCue !== c5.start) {
+            this.lastSpokenCue = c5.start;
+            this.speakCue(c5.text);
+          }
         }
       }
       if (this.p.enabled && this.p.mode === "audio" && this.audio && this.src) {
@@ -6082,11 +6105,69 @@ var SavannaAudioDescription = class extends i4 {
     if (this.p.enabled) this.stop();
     else void this.play();
   }
+  speakCue(text) {
+    if (typeof window === "undefined" || !window.speechSynthesis) {
+      this.status = text;
+      return;
+    }
+    try {
+      window.speechSynthesis.cancel();
+      const u3 = new SpeechSynthesisUtterance(text);
+      const isAm = /[\u1200-\u137F]/.test(text) || this.player?.lang === "am" || this.textVtt && this.textVtt.includes("am.vtt");
+      u3.lang = isAm ? "am-ET" : "en-US";
+      const voices = window.speechSynthesis.getVoices ? window.speechSynthesis.getVoices() : [];
+      if (isAm) {
+        const amVoice = voices.find((v2) => v2.lang.startsWith("am") || v2.name.toLowerCase().includes("amharic") || v2.name.toLowerCase().includes("ethiopic"));
+        if (amVoice) u3.voice = amVoice;
+      } else {
+        const enVoice = voices.find((v2) => v2.lang.startsWith("en") && (v2.name.includes("Natural") || v2.name.includes("Google") || v2.name.includes("Microsoft") || v2.default));
+        if (enVoice) u3.voice = enVoice;
+      }
+      u3.rate = 1;
+      if (this.p.extended && this.media && !this.media.paused) {
+        this.wasPlaying = true;
+        this.media.pause();
+        u3.onend = () => {
+          if (this.wasPlaying && this.media) {
+            this.wasPlaying = false;
+            this.media.play().catch(() => {
+            });
+          }
+        };
+        u3.onerror = () => {
+          if (this.wasPlaying && this.media) {
+            this.wasPlaying = false;
+            this.media.play().catch(() => {
+            });
+          }
+        };
+      }
+      window.speechSynthesis.speak(u3);
+    } catch {
+      this.status = text;
+    }
+  }
   async play() {
     this.p = { ...this.p, enabled: true };
     this.save();
+    if (this.p.mode === "speech") {
+      const hasSynth = typeof window !== "undefined" && !!window.speechSynthesis;
+      if (!hasSynth) {
+        this.status = "Speech synthesis is unavailable in this environment. Showing text descriptions.";
+        return;
+      }
+      this.status = this.active || "Spoken voice descriptions (TTS) are active. Play lesson to hear audio cues.";
+      if (this.active) {
+        this.speakCue(this.active);
+      }
+      return;
+    }
     if (this.p.mode === "text") {
       this.status = this.active || "Text descriptions are enabled.";
+      return;
+    }
+    if (this.p.mode === "audio") {
+      this.status = "Recorded human narration is not yet available for this lesson. Use Spoken voice (TTS) or Text descriptions.";
       return;
     }
     if (!this.src || !this.audio) {
@@ -6109,6 +6190,11 @@ var SavannaAudioDescription = class extends i4 {
     }
   }
   stop(persist = true) {
+    if (typeof window !== "undefined" && window.speechSynthesis) try {
+      window.speechSynthesis.cancel();
+    } catch {
+    }
+    this.lastSpokenCue = -1;
     this.audio?.pause();
     if (this.p.extended && this.wasPlaying) void this.media?.play().catch(() => {
     });
@@ -6132,7 +6218,7 @@ var SavannaAudioDescription = class extends i4 {
     return b2`<div class="controls">${badge}<button type="button" aria-pressed=${String(this.p.enabled)} aria-label="Audio description ${this.p.enabled ? "on" : "off"}" @click=${() => this.p.enabled ? this.stop() : void this.play()}>Audio description: ${this.p.enabled ? "On" : "Off"}</button><label>Mode <select .value=${this.p.mode} @change=${(e8) => {
       this.p = { ...this.p, mode: e8.target.value };
       this.save();
-    }}><option value="audio">Recorded audio</option><option value="text">Text descriptions</option></select></label><button @click=${this.play}>Play description</button><button @click=${this.stop}>Stop</button><label><input type="checkbox" .checked=${this.p.extended} @change=${(e8) => this.extended(e8.target.checked)}> Extended AD (pause lesson)</label></div><audio preload="metadata" .src=${this.src} @play=${() => {
+    }}><option value="speech">Spoken voice (TTS)</option><option value="text">Text descriptions</option><option value="audio">Recorded audio</option></select></label><button @click=${this.play}>Play description</button><button @click=${this.stop}>Stop</button><label><input type="checkbox" .checked=${this.p.extended} @change=${(e8) => this.extended(e8.target.checked)}> Extended AD (pause lesson)</label></div><audio preload="metadata" .src=${this.src} @play=${() => {
       if (this.p.extended) {
         this.wasPlaying = !!this.media && !this.media.paused;
         this.media?.pause();
