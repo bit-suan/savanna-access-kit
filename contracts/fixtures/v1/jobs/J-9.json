@@ -8,6 +8,24 @@
   "validThrough": "2026-12-31T23:59:59.000Z",
   "employmentType": "FULL_TIME",
   "applyUrl": "/apply/J-9",
+  "i18n": {
+    "title": {
+      "en": "Accessible Learning Support Associate",
+      "am": "የተደራሽ ትምህርት ድጋፍ ባለሙያ"
+    },
+    "employer": {
+      "en": "Digital Bridge Ethiopia",
+      "am": "ዲጂታል ብሪጅ ኢትዮጵያ"
+    },
+    "location": {
+      "en": "Addis Ababa / remote",
+      "am": "አዲስ አበባ / ከርቀት"
+    },
+    "payText": {
+      "en": "ETB 18,000–24,000 / month",
+      "am": "በወር ከ18,000–24,000 ብር"
+    }
+  },
   "description": {
     "en": "Help Digital Bridge learners use captions, sign language and offline packs. Remote-friendly, screen-reader-tested application.",
     "am": "የዲጂታል ብሪጅ ተማሪዎች መግለጫ ጽሑፍ፣ የኢትዮጵያ የምልክት ቋንቋ እና ከመስመር ውጭ ጥቅሎችን እንዲጠቀሙ ያግዙ። ማመልከቻው ከርቀት ተስማሚ እና በማያ ንባብ የተሞከረ ነው።",

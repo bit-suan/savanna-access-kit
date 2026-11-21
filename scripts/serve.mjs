@@ -2,6 +2,7 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { generateCertificatePdf } from "./generate-certificate-pdf.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
@@ -91,7 +92,8 @@ const server = http.createServer((req, res) => {
 
   // 1. DID Document
   if (pathname === "/.well-known/did.json") {
-    const host = req.headers.host || "localhost:8080";
+    const rawHost = req.headers.host || "savanna-access-kit.vercel.app";
+    const host = (!rawHost.includes("localhost") && !rawHost.includes("127.0.0.1")) ? rawHost : "savanna-access-kit.vercel.app";
     const did = `did:web:${encodeURIComponent(host)}`;
     const data = {
       "@context": ["https://www.w3.org/ns/did/v1", "https://w3id.org/security/multikey/v1"],
@@ -114,18 +116,21 @@ const server = http.createServer((req, res) => {
   // 2. Open Badges JSON-LD Endpoint
   const verifyJsonMatch = pathname.match(/^\/verify\/([\w-]+)\.json$/);
   if (verifyJsonMatch) {
-    const host = req.headers.host || "localhost:8080";
+    const rawHost = req.headers.host || "savanna-access-kit.vercel.app";
+    const host = (!rawHost.includes("localhost") && !rawHost.includes("127.0.0.1")) ? rawHost : "savanna-access-kit.vercel.app";
     const id = verifyJsonMatch[1];
+    const did = `did:web:${encodeURIComponent(host)}`;
+    const verifyUrl = `https://${host}/verify/${id}`;
     const data = {
       "@context": [
         "https://www.w3.org/ns/credentials/v2",
         "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json"
       ],
-      id: `http://${host}/verify/${id}`,
+      id: verifyUrl,
       type: ["VerifiableCredential", "OpenBadgeCredential"],
       name: "Digital Bridge — Accessible Media Basics",
       issuer: {
-        id: `did:web:${encodeURIComponent(host)}`,
+        id: did,
         type: ["Profile"],
         name: "Savanna Access Kit"
       },
@@ -135,7 +140,7 @@ const server = http.createServer((req, res) => {
         type: ["AchievementSubject"],
         name: "Demo Learner",
         achievement: {
-          id: `http://${host}/achievements/Digital%20Bridge%20%E2%80%94%20Accessible%20Media%20Basics`,
+          id: `https://${host}/achievements/Digital%20Bridge%20%E2%80%94%20Accessible%20Media%20Basics`,
           type: ["Achievement"],
           name: "Digital Bridge — Accessible Media Basics",
           description: "ኮርሱን ከጨረሰ በኋላ በሳቫና ተደራሽነት ኪት የተሰጠ። (Issued by Savanna Access Kit upon module completion)",
@@ -146,13 +151,61 @@ const server = http.createServer((req, res) => {
         type: "DataIntegrityProof",
         cryptosuite: "eddsa-rdfc-2022",
         created: "2026-11-12T08:00:00.000Z",
-        verificationMethod: `did:web:${encodeURIComponent(host)}#key-1`,
+        verificationMethod: `${did}#key-1`,
         proofPurpose: "assertionMethod",
-        proofValue: "z24W8nkg9kX4n7yvW8mQPJvL319dkmq2vH8aK9nLQp..."
+        proofValue: "z5rOx2v9yrDu64XLelz_lrwPKFFscq1VAgHeDLWXZQVpCi833RbchYTjQiiscRAuVrRqgrhBIeSdfgL9hHOPFBg"
       }
     };
     res.writeHead(200, { "Content-Type": "application/ld+json" });
     res.end(JSON.stringify(data, null, 2));
+    return;
+  }
+
+  // 2b. Certificate PDF Download Endpoint (/verify/:id/pdf or /v1/credentials/:id/pdf)
+  const pdfMatch = pathname.match(/^\/(?:v1\/credentials|verify)\/([\w-]+)\/pdf$/);
+  if (pdfMatch) {
+    const id = pdfMatch[1];
+    const rawHost = req.headers.host || "savanna-access-kit.vercel.app";
+    const host = (!rawHost.includes("localhost") && !rawHost.includes("127.0.0.1")) ? rawHost : "savanna-access-kit.vercel.app";
+    const lang = parsedUrl.searchParams.get("lang") || "en";
+    const verifyUrl = `https://${host}/verify/${id}`;
+
+    // Read fixture or defaults
+    const credFixture = path.join(fixturesRoot, "v1/credentials", `${id}.json`);
+    let record = {
+      id,
+      recipientName: "Demo Learner",
+      achievement: "Digital Bridge — Accessible Media Basics",
+      issuedAt: "2026-11-12T08:00:00.000Z",
+      status: "valid"
+    };
+    if (fs.existsSync(credFixture)) {
+      try {
+        const parsed = JSON.parse(fs.readFileSync(credFixture, "utf8"));
+        record = { ...record, ...parsed };
+      } catch {}
+    }
+
+    const pdfBuffer = generateCertificatePdf({
+      id: record.id,
+      recipientName: record.recipientName,
+      achievement: record.achievement,
+      issuerName: "Savanna Access Kit",
+      issuerDid: `did:web:${encodeURIComponent(host)}`,
+      issuedAt: record.issuedAt || record.validFrom || "2026-11-12T08:00:00.000Z",
+      status: record.status || "valid",
+      verifyUrl,
+      lang
+    });
+
+    res.writeHead(200, {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="certificate-${id}.pdf"`,
+      "Content-Length": pdfBuffer.length,
+      "Access-Control-Allow-Origin": "*",
+      "Cache-Control": "public, max-age=3600"
+    });
+    res.end(pdfBuffer);
     return;
   }
 
@@ -275,4 +328,5 @@ if (!process.env.VERCEL) {
   });
 }
 
+export { server };
 export default server;

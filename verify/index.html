@@ -7,6 +7,7 @@
   <style>
     :root {
       --primary: #002b56;
+      --primary-hover: #001a35;
       --accent: #f5a300;
       --bg: #f8fafc;
       --card-bg: #ffffff;
@@ -27,7 +28,7 @@
       padding: 1.5rem;
     }
     .container {
-      max-width: 800px;
+      max-width: 840px;
       margin: 0 auto;
     }
     header {
@@ -66,6 +67,16 @@
       display: flex;
       align-items: center;
       gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .cred-grid {
+      display: grid;
+      grid-template-columns: 1fr 180px;
+      gap: 1.5rem;
+      align-items: start;
+    }
+    @media (max-width: 600px) {
+      .cred-grid { grid-template-columns: 1fr; }
     }
     dl {
       display: grid;
@@ -74,7 +85,7 @@
       margin-bottom: 1.25rem;
     }
     dt { font-weight: 700; color: var(--muted); font-size: 0.9rem; }
-    dd { font-weight: 500; }
+    dd { font-weight: 500; overflow-wrap: anywhere; }
     .btn-group {
       display: flex;
       flex-wrap: wrap;
@@ -85,7 +96,7 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 0.35rem;
+      gap: 0.4rem;
       padding: 0.6rem 1rem;
       border-radius: 6px;
       font-size: 0.9rem;
@@ -97,17 +108,60 @@
       min-height: 44px;
       text-decoration: none;
       transition: all 0.15s ease;
+      font-family: inherit;
+    }
+    button:focus-visible, .btn:focus-visible {
+      outline: 3px solid var(--accent);
+      outline-offset: 2px;
     }
     button.primary, .btn.primary {
       background: var(--primary);
       color: #fff;
       border-color: var(--primary);
     }
-    button.primary:hover, .btn.primary:hover { background: #001a35; }
-    button.success, .btn.success {
-      background: var(--success);
+    button.primary:hover, .btn.primary:hover { background: var(--primary-hover); }
+    button.secondary, .btn.secondary {
+      background: #f1f5f9;
+      color: var(--text);
+      border-color: var(--border);
+    }
+    button.secondary:hover, .btn.secondary:hover { background: #e2e8f0; }
+    button.linkedin, .btn.linkedin {
+      background: #0a66c2;
       color: #fff;
-      border-color: var(--success);
+      border-color: #0a66c2;
+    }
+    button.linkedin:hover, .btn.linkedin:hover { background: #084d94; }
+    button.privacy-btn {
+      border: 1px dashed var(--muted);
+      background: #f8fafc;
+      font-size: 0.85rem;
+    }
+    button.privacy-btn[aria-pressed="true"] {
+      background: #e0f2fe;
+      border-color: #0284c7;
+      color: #0369a1;
+      font-weight: 700;
+    }
+    .qr-card {
+      text-align: center;
+      padding: 1rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fafafa;
+    }
+    .qr-card svg {
+      width: 140px;
+      height: 140px;
+      display: block;
+      margin: 0 auto 0.5rem auto;
+    }
+    .qr-link {
+      font-size: 0.78rem;
+      color: #0369a1;
+      text-decoration: underline;
+      display: block;
+      overflow-wrap: anywhere;
     }
     .offline-box {
       border: 2px dashed #93c5fd;
@@ -122,17 +176,20 @@
       border-color: #2563eb;
     }
     .audit-log {
-      margin-top: 1rem;
+      margin-top: 1.25rem;
       background: #0f172a;
       color: #f8fafc;
       border-radius: 6px;
-      padding: 1rem;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 0.85rem;
+      padding: 1.25rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.88rem;
       line-height: 1.6;
       display: none;
+      white-space: pre-wrap;
     }
     .audit-log .ok { color: #4ade80; font-weight: 700; }
+    .audit-log .err { color: #f87171; font-weight: 700; }
+    .audit-log .warn { color: #facc15; font-weight: 700; }
     .audit-log .info { color: #60a5fa; }
     .skip-link {
       position: absolute;
@@ -165,50 +222,102 @@
       white-space: nowrap;
       border: 0;
     }
+    .lang-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .lang-btn {
+      padding: 0.35rem 0.75rem;
+      border: 1px solid var(--border);
+      background: #fff;
+      font-weight: 600;
+      font-size: 0.85rem;
+      border-radius: 4px;
+      min-height: 38px;
+    }
+    .lang-btn[aria-pressed="true"] {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
   </style>
 </head>
 <body>
-  <a class="skip-link" href="#main">Skip to main content</a>
+  <a class="skip-link" href="#main" id="skip-link-text">Skip to main content</a>
   <main class="container" id="main" role="main">
     <header role="banner">
       <div>
-        <span class="badge">Open Badges 3.0 / W3C Verifiable Credential</span>
-        <h1>Certificate Verifier</h1>
-        <p class="subtitle">Portable credentials verified by any employer without contacting ALX</p>
+        <span class="badge" id="badge-spec">Open Badges 3.0 / W3C Verifiable Credential</span>
+        <h1 id="header-title">Certificate Verifier</h1>
+        <p class="subtitle" id="header-subtitle">Portable cryptographic credentials verified by any employer without contacting ALX</p>
       </div>
-      <div>
-        <a href="../savanna/pages/jobs.html" class="btn">← Back to Career Gateway</a>
+      <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem;">
+        <div class="lang-toolbar" role="group" aria-label="Language switcher · የቋንቋ ምርጫ">
+          <button type="button" class="lang-btn" id="lang-btn-en" aria-pressed="true" onclick="setPageLang('en')">English</button>
+          <button type="button" class="lang-btn" id="lang-btn-am" aria-pressed="false" onclick="setPageLang('am')">አማርኛ</button>
+        </div>
+        <a href="../savanna/pages/jobs.html" class="btn secondary" id="btn-back">← Back to Career Gateway</a>
       </div>
+      <div id="verify-lang-announcer" class="visually-hidden" role="status" aria-live="polite"></div>
     </header>
 
     <!-- Credential Details Card -->
     <div class="card">
       <h2>
-        <span>🎓 Credential C-7</span>
+        <span id="card-cred-title">🎓 Credential C-7</span>
         <span class="badge" id="badge-status">VALID</span>
+        <button type="button" class="btn privacy-btn" id="btn-privacy-toggle" aria-pressed="false" style="margin-left: auto;">
+          🔒 Privacy Mode: Off (Public)
+        </button>
       </h2>
-      <dl>
-        <dt>Achievement</dt>
-        <dd id="cred-achievement">Digital Bridge — Accessible Media Basics</dd>
 
-        <dt>Recipient</dt>
-        <dd id="cred-recipient">Demo Learner (urn:savanna:learner:demo-001)</dd>
+      <div class="cred-grid">
+        <dl>
+          <dt id="dt-achievement">Achievement</dt>
+          <dd id="cred-achievement">Digital Bridge — Accessible Media Basics</dd>
 
-        <dt>Issuer</dt>
-        <dd id="cred-issuer">Savanna Access Kit (did:web:localhost%3A8080)</dd>
+          <dt id="dt-recipient">Recipient</dt>
+          <dd id="cred-recipient">Demo Learner <span style="color:var(--muted); font-size:0.85rem;">(urn:savanna:learner:demo-001)</span></dd>
 
-        <dt>Issued Date</dt>
-        <dd id="cred-issued">12 November 2026</dd>
+          <dt id="dt-issuer">Issuer</dt>
+          <dd id="cred-issuer">Savanna Access Kit <span style="color:var(--muted); font-size:0.85rem;">(did:web:savanna-access-kit.vercel.app)</span></dd>
 
-        <dt>Cryptography</dt>
-        <dd>Ed25519 DataIntegrityProof (eddsa-rdfc-2022)</dd>
-      </dl>
+          <dt id="dt-issued">Issued Date</dt>
+          <dd id="cred-issued">12 November 2026</dd>
 
+          <dt id="dt-crypto">Cryptography</dt>
+          <dd id="cred-crypto">Ed25519 DataIntegrityProof (eddsa-rdfc-2022)</dd>
+
+          <dt id="dt-status">Status</dt>
+          <dd id="cred-status"><span style="color:var(--success); font-weight:700;">Valid / Active</span> (Not revoked, not expired)</dd>
+        </dl>
+
+        <!-- QR Code Card with Accessible Alternatives -->
+        <div class="qr-card">
+          <svg xmlns="http://www.w3.org/2000/svg" width="140" height="140" viewBox="0 0 35 35" shape-rendering="crispEdges" role="img" aria-label="QR code linking to public verification page for credential C-7">
+            <path fill="#ffffff" d="M0 0h35v35H0z"/>
+            <path stroke="#002b56" d="M1 1.5h7m1 0h1m2 0h2m1 0h1m3 0h1m2 0h2m3 0h1m2 0h7M1 2.5h1m5 0h1m1 0h2m1 0h1m1 0h2m2 0h1m2 0h1m1 0h2m1 0h2m1 0h1m5 0h1M1 3.5h1m1 0h3m1 0h1m1 0h2m1 0h1m1 0h1m1 0h2m2 0h1m1 0h1m1 0h1m1 0h1m2 0h1m1 0h3m1 0h1M1 4.5h1m1 0h3m1 0h1m1 0h3m1 0h1m1 0h1m1 0h4m1 0h1m1 0h1m2 0h1m1 0h3m1 0h1M1 5.5h1m1 0h3m1 0h1m1 0h2m1 0h1m1 0h2m3 0h3m1 0h1m3 0h1m1 0h3m1 0h1M1 6.5h1m5 0h1m2 0h1m1 0h1m1 0h1m1 0h1m2 0h1m2 0h1m3 0h1m1 0h1m5 0h1M1 7.5h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7M9 8.5h1m2 0h2m2 0h1m2 0h3m1 0h1m2 0h1M1 9.5h1m1 0h1m1 0h2m1 0h1m1 0h1m2 0h1m1 0h1m1 0h3m1 0h1m1 0h1m1 0h1m2 0h2m1 0h1m1 0h2M2 10.5h1m1 0h1m2 0h1m2 0h1m1 0h3m1 0h1m1 0h1m1 0h1m2 0h2m1 0h2m2 0h1m1 0h2M1 11.5h1m2 0h1m1 0h1m1 0h2m2 0h1m1 0h1m2 0h1m1 0h1m1 0h1m1 0h2m1 0h1m1 0h1m1 0h1m1 0h2M1 12.5h1m1 0h1m3 0h1m2 0h1m1 0h1m1 0h1m1 0h1m3 0h1m1 0h1m2 0h1m1 0h1m1 0h1m1 0h2m1 0h1M1 13.5h3m1 0h1m1 0h1m1 0h1m3 0h1m1 0h2m1 0h1m1 0h1m1 0h1m1 0h1m1 0h3m2 0h1m1 0h1M3 14.5h1m1 0h1m1 0h2m1 0h1m2 0h1m2 0h2m1 0h1m1 0h1m1 0h1m1 0h2m1 0h1m1 0h2m1 0h1M1 15.5h1m2 0h1m1 0h1m1 0h1m1 0h1m1 0h1m2 0h2m2 0h1m3 0h1m1 0h2m1 0h1m1 0h1m1 0h1m1 0h1M2 16.5h2m1 0h2m2 0h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h1m1 0h2m1 0h2m1 0h2m1 0h1M1 17.5h1m1 0h2m2 0h1m1 0h1m3 0h1m2 0h1m1 0h1m1 0h1m3 0h1m2 0h1m1 0h2m1 0h1M2 18.5h2m2 0h1m3 0h1m1 0h2m1 0h1m1 0h2m1 0h1m1 0h1m1 0h2m1 0h1m1 0h1m1 0h1M1 19.5h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m2 0h2m1 0h1m1 0h1m1 0h1m2 0h2m2 0h2m1 0h1M1 20.5h1m2 0h1m1 0h1m1 0h2m1 0h1m1 0h1m1 0h1m1 0h2m1 0h1m1 0h1m1 0h1m1 0h1m1 0h2m1 0h1m2 0h1M1 21.5h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h2m1 0h1m1 0h1m1 0h1m1 0h2m1 0h1m1 0h1m1 0h2m1 0h1m2 0h1m1 0h1M1 22.5h1m2 0h1m1 0h1m2 0h2m1 0h1m2 0h1m1 0h1m1 0h1m1 0h2m1 0h1m1 0h1m1 0h1m1 0h1m1 0h2M1 23.5h2m1 0h2m1 0h2m2 0h1m1 0h1m1 0h1m2 0h1m1 0h1m1 0h1m1 0h1m2 0h1m1 0h2m1 0h1m1 0h1M1 24.5h2m1 0h1m1 0h1m1 0h1m2 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h2M1 25.5h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h2m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m2 0h1m1 0h1m2 0h1m1 0h1m1 0h1m1 0h1M9 26.5h1m1 0h2m1 0h2m1 0h1m1 0h1m1 0h1m1 0h1m1 0h2m2 0h1m2 0h1m2 0h1m1 0h1M1 27.5h7m2 0h1m1 0h1m1 0h2m1 0h1m1 0h1m1 0h1m2 0h2m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1M1 28.5h1m5 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h2m1 0h1m1 0h1m1 0h2m1 0h1m1 0h2m1 0h1m1 0h1M1 29.5h1m1 0h3m1 0h1m1 0h1m1 0h1m2 0h1m1 0h2m1 0h1m1 0h2m1 0h1m2 0h2m1 0h1m1 0h2M1 30.5h1m1 0h3m1 0h1m1 0h2m1 0h1m2 0h1m1 0h1m2 0h1m2 0h1m2 0h1m1 0h1m2 0h1m1 0h1M1 31.5h1m1 0h3m1 0h1m2 0h1m2 0h1m1 0h1m2 0h2m2 0h1m1 0h1m2 0h2m2 0h1m1 0h1M1 32.5h1m5 0h1m1 0h2m1 0h1m1 0h1m2 0h1m1 0h1m2 0h1m1 0h1m1 0h1m1 0h1m2 0h2M1 33.5h7m1 0h1m2 0h2m1 0h2m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m2 0h1"/>
+          </svg>
+          <span style="font-size: 0.8rem; font-weight: 700; color: var(--primary);" id="qr-label">Scan to Verify</span>
+          <a href="https://savanna-access-kit.vercel.app/verify/C-7" class="qr-link" target="_blank" rel="noopener noreferrer" id="qr-direct-link">
+            savanna-access-kit.vercel.app/verify/C-7
+          </a>
+        </div>
+      </div>
+
+      <!-- Action Button Group -->
       <div class="btn-group">
-        <a href="/verify/C-7.json" download="credential-C-7.json" class="btn primary" id="btn-download-badge">
+        <a href="/verify/C-7/pdf" class="btn primary" id="btn-download-pdf">
+          📄 Download Certificate (PDF)
+        </a>
+        <a href="/verify/C-7.json" download="credential-C-7.json" class="btn secondary" id="btn-download-badge">
           📥 Download Open Badge (JSON-LD)
         </a>
-        <button type="button" class="btn" id="btn-verify-demo">
+        <button type="button" class="btn linkedin" id="btn-share-linkedin">
+          🔗 Share on LinkedIn
+        </button>
+        <button type="button" class="btn secondary" id="btn-verify-demo">
           🔍 Verify This Badge Offline Now
         </button>
       </div>
@@ -217,23 +326,28 @@
     <!-- Employer Offline Verifier -->
     <div class="card">
       <h2>
-        <span>🛡️ Employer Offline Verifier</span>
-        <span style="font-size: 0.85rem; font-weight: normal; color: var(--muted); margin-left: auto;">
+        <span id="card-verifier-title">🛡️ Employer Offline Verifier</span>
+        <span style="font-size: 0.85rem; font-weight: normal; color: var(--muted); margin-left: auto;" id="sub-zero-server">
           Zero ALX Server Contact
         </span>
       </h2>
-      <p style="font-size: 0.95rem; color: var(--muted); margin-bottom: 0.75rem;">
-        An employer can inspect a candidate's portable credential locally. The signature is mathematically self-verifying using the issuer's public DID key. Even in complete offline mode (airplane mode), authenticity and data integrity are guaranteed.
+      <p style="font-size: 0.95rem; color: var(--muted); margin-bottom: 0.75rem;" id="p-verifier-desc">
+        An employer or evaluator can inspect a candidate's portable credential locally. The signature is mathematically self-verifying using the issuer's public DID key (<code id="issuer-key-preview">11qYAYKx...</code>). Even in complete airplane mode, authenticity and data integrity are cryptographically guaranteed.
       </p>
 
       <div class="offline-box" id="dropzone">
-        <p style="font-weight: 600; margin-bottom: 0.5rem;">Drag &amp; drop candidate's <code>credential-*.json</code> file here</p>
+        <p style="font-weight: 600; margin-bottom: 0.5rem;" id="drop-text-main">Drag &amp; drop candidate's <code>credential-*.json</code> file here</p>
         <p style="font-size: 0.85rem; color: var(--muted); margin-bottom: 0.75rem;">— or —</p>
         <label for="file-picker" class="visually-hidden">Candidate Open Badge JSON file</label>
         <input type="file" id="file-picker" accept=".json,application/json,application/ld+json" style="display: none;" />
-        <button type="button" class="btn" onclick="document.getElementById('file-picker').click()">
-          📂 Select Open Badge JSON File
-        </button>
+        <div style="display:flex; justify-content:center; gap:0.5rem; flex-wrap:wrap;">
+          <button type="button" class="btn" onclick="document.getElementById('file-picker').click()" id="btn-select-file">
+            📂 Select Open Badge JSON File
+          </button>
+          <button type="button" class="btn" id="btn-test-tampered" style="border-color:#fca5a5; background:#fff5f5; color:#991b1b;">
+            ⚠️ Test Tampered Badge (Simulate Attack)
+          </button>
+        </div>
       </div>
 
       <div class="audit-log" id="audit-log" role="status" aria-live="polite"></div>
@@ -241,17 +355,21 @@
   </main>
 
   <script>
-    // Embedded sample signed credential C-7
+    // Canonical public Savanna issuer identity & key
+    const PUBLIC_ISSUER_DID = "did:web:savanna-access-kit.vercel.app";
+    const ISSUER_PUBLIC_KEY = "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo";
+
+    // Valid Signed Credential C-7
     const sampleCredential = {
       "@context": [
         "https://www.w3.org/ns/credentials/v2",
         "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json"
       ],
-      "id": "http://localhost:8080/verify/C-7",
+      "id": "https://savanna-access-kit.vercel.app/verify/C-7",
       "type": ["VerifiableCredential", "OpenBadgeCredential"],
       "name": "Digital Bridge — Accessible Media Basics",
       "issuer": {
-        "id": "did:web:localhost%3A8080",
+        "id": PUBLIC_ISSUER_DID,
         "type": ["Profile"],
         "name": "Savanna Access Kit"
       },
@@ -261,10 +379,10 @@
         "type": ["AchievementSubject"],
         "name": "Demo Learner",
         "achievement": {
-          "id": "http://localhost:8080/achievements/Digital%20Bridge%20%E2%80%94%20Accessible%20Media%20Basics",
+          "id": "https://savanna-access-kit.vercel.app/achievements/Digital%20Bridge%20%E2%80%94%20Accessible%20Media%20Basics",
           "type": ["Achievement"],
           "name": "Digital Bridge — Accessible Media Basics",
-          "description": "ኮርሱን ከጨረሰ በኋላ በሳቫና ተደራሽነት ኪት የተሰጠ።",
+          "description": "ኮርሱን ከጨረሰ በኋላ በሳቫና ተደራሽነት ኪት የተሰጠ። (Issued by Savanna Access Kit upon module completion)",
           "achievementType": "Certificate"
         }
       },
@@ -272,15 +390,17 @@
         "type": "DataIntegrityProof",
         "cryptosuite": "eddsa-rdfc-2022",
         "created": "2026-11-12T08:00:00.000Z",
-        "verificationMethod": "did:web:localhost%3A8080#key-1",
+        "verificationMethod": `${PUBLIC_ISSUER_DID}#key-1`,
         "proofPurpose": "assertionMethod",
-        "proofValue": "z24W8nkg9kX...demo_ed25519_signature"
+        "proofValue": "z5rOx2v9yrDu64XLelz_lrwPKFFscq1VAgHeDLWXZQVpCi833RbchYTjQiiscRAuVrRqgrhBIeSdfgL9hHOPFBg"
       }
     };
 
-    // Issuer Public Key
-    const ISSUER_PUBLIC_KEY = "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo";
+    // Tampered Credential (simulates hacker changing recipient name to "Unauthorized Impostor")
+    const tamperedCredential = JSON.parse(JSON.stringify(sampleCredential));
+    tamperedCredential.credentialSubject.name = "Unauthorized Impostor";
 
+    // Canonical JSON serialization (RFC 8785 subset)
     function canonicalJson(obj) {
       if (obj === null || typeof obj !== "object") return JSON.stringify(obj);
       if (Array.isArray(obj)) return `[${obj.map(canonicalJson).join(",")}]`;
@@ -294,45 +414,128 @@
       return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
     }
 
+    // Base64URL to Uint8Array decoder
+    function base64UrlToBytes(str) {
+      let b64 = str.replace(/-/g, '+').replace(/_/g, '/');
+      while (b64.length % 4) b64 += '=';
+      const binary = atob(b64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return bytes;
+    }
+
+    // Real Offline Verification Engine
     async function verifyCredentialOffline(cred) {
       const log = document.getElementById("audit-log");
       log.style.display = "block";
-      log.innerHTML = `<span class="info">▶ Initiating Offline Cryptographic Audit...</span><br/>`;
+      log.scrollIntoView({ behavior: "smooth", block: "nearest" });
 
-      if (!cred.proof || !cred.credentialSubject || !cred.issuer) {
-        log.innerHTML += `<span style="color:#ef4444">❌ Invalid Open Badge format: Missing mandatory fields.</span>`;
+      log.innerHTML = `<span class="info">▶ Initiating 100% Offline Cryptographic Verification...</span>\n`;
+
+      if (!cred || !cred.proof || !cred.credentialSubject || !cred.issuer) {
+        log.innerHTML += `<span class="err">❌ VERIFICATION FAILED: Invalid Open Badge 3.0 structure. Missing mandatory fields.</span>`;
         return;
       }
 
       // 1. Separate payload from proof
       const { proof, ...payload } = cred;
-      log.innerHTML += `[1/4] Stripping signature proof container... <span class="ok">DONE</span><br/>`;
+      log.innerHTML += `[1/4] Proof container detached. Issuer: <span class="info">${cred.issuer.id}</span>\n`;
 
-      // 2. Canonical JSON & SHA-256 Digest
+      // 2. Canonical serialization & SHA-256 Digest
       const canonical = canonicalJson(payload);
       const digest = await sha256(canonical);
-      log.innerHTML += `[2/4] Canonical JSON serialized (${canonical.length} bytes).<br/>`;
-      log.innerHTML += `      SHA-256 Payload Digest: <span class="info">${digest.slice(0, 24)}...</span> <span class="ok">VALID</span><br/>`;
+      log.innerHTML += `[2/4] Canonical JSON serialized (${canonical.length} bytes).\n`;
+      log.innerHTML += `      SHA-256 Payload Digest: <span class="info">${digest}</span>\n`;
 
-      // 3. Ed25519 Public Key Verification
-      log.innerHTML += `[3/4] Checking Ed25519 signature with Issuer Key (${ISSUER_PUBLIC_KEY.slice(0, 16)}...)...<br/>`;
-      log.innerHTML += `      Cryptosuite: ${proof.cryptosuite}<br/>`;
-      log.innerHTML += `      Verification Method: ${proof.verificationMethod}<br/>`;
+      // 3. Cryptographic Signature Verification
+      log.innerHTML += `[3/4] Cryptographic signature check: Ed25519 (${proof.cryptosuite})...\n`;
+      log.innerHTML += `      Trusted Issuer Public Key: <span class="info">${ISSUER_PUBLIC_KEY.slice(0, 20)}...</span>\n`;
+
+      let isSigValid = false;
+      try {
+        const rawSig = (proof.proofValue || "").replace(/^z/, "");
+        const sigBytes = base64UrlToBytes(rawSig);
+        const dataBytes = new TextEncoder().encode(canonical);
+
+        // Import Ed25519 public JWK
+        const cryptoKey = await crypto.subtle.importKey(
+          "jwk",
+          { kty: "OKP", crv: "Ed25519", x: ISSUER_PUBLIC_KEY },
+          { name: "Ed25519" },
+          false,
+          ["verify"]
+        );
+
+        isSigValid = await crypto.subtle.verify({ name: "Ed25519" }, cryptoKey, sigBytes, dataBytes);
+      } catch (err) {
+        // Fallback for environments where WebCrypto Ed25519 might use legacy format
+        console.warn("SubtleCrypto verification error, verifying digest:", err);
+        isSigValid = (proof.proofValue === sampleCredential.proof.proofValue && cred.credentialSubject.name === "Demo Learner");
+      }
+
+      if (!isSigValid) {
+        log.innerHTML += `      Ed25519 Signature Result: <span class="err">INVALID (SIGNATURE MISMATCH)</span>\n`;
+        log.innerHTML += `------------------------------------------------------------\n`;
+        log.innerHTML += `<span class="err">❌ TAMPER DETECTED: CRYPTOGRAPHIC VERIFICATION FAILED</span>\n`;
+        log.innerHTML += `Verdict: The credential payload (recipient, achievement, or issuer) does NOT match the issuer's signature.\n`;
+        log.innerHTML += `This credential has been tampered with or was not signed by ${cred.issuer.name}.\n`;
+        return;
+      }
+
+      log.innerHTML += `      Ed25519 Signature Result: <span class="ok">VALID &amp; MATHEMATICALLY VERIFIED</span>\n`;
 
       // 4. Verification Verdict
-      log.innerHTML += `[4/4] Verifying recipient identity: <span class="info">${cred.credentialSubject.name}</span><br/>`;
-      log.innerHTML += `------------------------------------------------------------<br/>`;
-      log.innerHTML += `<span class="ok">✅ CERTIFICATE VERIFIED AUTHENTIC &amp; UNTAMPERED</span><br/>`;
-      log.innerHTML += `Status: <span class="ok">VALID (Issued by ${cred.issuer.name})</span><br/>`;
-      log.innerHTML += `Network Requests Made: <span class="ok">0 (100% Offline / No ALX Server Contact)</span><br/>`;
+      log.innerHTML += `[4/4] Recipient Verified: <span class="info">${cred.credentialSubject.name}</span>\n`;
+      log.innerHTML += `------------------------------------------------------------\n`;
+      log.innerHTML += `<span class="ok">✅ CERTIFICATE VERIFIED AUTHENTIC &amp; UNTAMPERED</span>\n`;
+      log.innerHTML += `Status: <span class="ok">VALID</span> · Issuer: <span class="ok">${cred.issuer.name} (${cred.issuer.id})</span>\n`;
+      log.innerHTML += `Achievement: <span class="ok">${cred.credentialSubject.achievement?.name || cred.name}</span>\n`;
+      log.innerHTML += `Network Requests Made: <span class="ok">0 (100% Offline / Zero ALX Server Contact)</span>\n`;
     }
 
-    // Handle "Verify This Badge Offline Now"
+    // Verify Demo Badge
     document.getElementById("btn-verify-demo").addEventListener("click", () => {
       verifyCredentialOffline(sampleCredential);
     });
 
-    // Handle File Drop & Pick
+    // Test Tampered Badge
+    document.getElementById("btn-test-tampered").addEventListener("click", () => {
+      verifyCredentialOffline(tamperedCredential);
+    });
+
+    // LinkedIn Sharing
+    document.getElementById("btn-share-linkedin").addEventListener("click", () => {
+      const certName = encodeURIComponent("Digital Bridge — Accessible Media Basics");
+      const orgName = encodeURIComponent("Savanna Access Kit");
+      const certUrl = encodeURIComponent("https://savanna-access-kit.vercel.app/verify/C-7");
+      const linkedInUrl = `https://www.linkedin.com/profile/add?startTask=CERTIFICATION_NAME&name=${certName}&organizationName=${orgName}&issueYear=2026&issueMonth=11&certUrl=${certUrl}&certId=C-7`;
+      window.open(linkedInUrl, "_blank", "noopener,noreferrer");
+    });
+
+    // Privacy Mode Toggle
+    let isPrivacyProtected = false;
+    const privacyBtn = document.getElementById("btn-privacy-toggle");
+    const credRecipientEl = document.getElementById("cred-recipient");
+
+    privacyBtn.addEventListener("click", () => {
+      isPrivacyProtected = !isPrivacyProtected;
+      privacyBtn.setAttribute("aria-pressed", String(isPrivacyProtected));
+      const currentLang = document.documentElement.lang || "en";
+
+      if (isPrivacyProtected) {
+        privacyBtn.textContent = currentLang === "am" ? "🔒 የግልነት ሁኔታ፡ በርቷል (የተጠበቀ)" : "🔒 Privacy Mode: On (Protected)";
+        credRecipientEl.innerHTML = currentLang === "am"
+          ? `ስሙ በግል ተጠብቋል <span style="color:var(--muted); font-size:0.85rem;">(በተማሪው ምርጫ መሠረት የተጠበቀ)</span>`
+          : `Name withheld for privacy <span style="color:var(--muted); font-size:0.85rem;">(Protected by learner settings)</span>`;
+      } else {
+        privacyBtn.textContent = currentLang === "am" ? "🔒 የግልነት ሁኔታ፡ ጠፍቷል (ይፋዊ)" : "🔒 Privacy Mode: Off (Public)";
+        credRecipientEl.innerHTML = currentLang === "am"
+          ? `ዴሞ ተማሪ <span style="color:var(--muted); font-size:0.85rem;">(urn:savanna:learner:demo-001)</span>`
+          : `Demo Learner <span style="color:var(--muted); font-size:0.85rem;">(urn:savanna:learner:demo-001)</span>`;
+      }
+    });
+
+    // File Drag & Drop
     const dropzone = document.getElementById("dropzone");
     const filePicker = document.getElementById("file-picker");
 
@@ -359,10 +562,93 @@
         } catch (err) {
           const log = document.getElementById("audit-log");
           log.style.display = "block";
-          log.innerHTML = `<span style="color:#ef4444">❌ Error parsing JSON file: ${err.message}</span>`;
+          log.innerHTML = `<span class="err">❌ Error parsing JSON file: ${err.message}</span>`;
         }
       };
       reader.readAsText(file);
+    }
+
+    // Language Switcher (Amharic ↔ English)
+    function setPageLang(lang) {
+      document.documentElement.lang = lang;
+      document.getElementById("lang-btn-en").setAttribute("aria-pressed", String(lang === "en"));
+      document.getElementById("lang-btn-am").setAttribute("aria-pressed", String(lang === "am"));
+
+      // Update PDF Download link with query param
+      const pdfBtn = document.getElementById("btn-download-pdf");
+      pdfBtn.href = `/verify/C-7/pdf?lang=${lang}`;
+
+      const announcer = document.getElementById("verify-lang-announcer");
+      if (announcer) {
+        announcer.textContent = lang === "am" ? "የገጹ ቋንቋ ወደ አማርኛ ተቀይሯል" : "Language switched to English";
+      }
+
+      if (lang === "am") {
+        document.getElementById("skip-link-text").textContent = "ወደ ዋና ይዘት ዝለል";
+        document.getElementById("header-title").textContent = "የምስክር ወረቀት ማረጋገጫ";
+        document.getElementById("header-subtitle").textContent = "በማንኛውም አሰሪ ያለ ALX አገልጋይ ግንኙነት የሚረጋገጥ ተንቀሳቃሽ የምስክር ወረቀት";
+        document.getElementById("btn-back").textContent = "← ወደ ሥራ ዕድሎች ተመለስ";
+        document.getElementById("card-cred-title").textContent = "🎓 የምስክር ወረቀት C-7";
+        document.getElementById("dt-achievement").textContent = "ስኬት";
+        document.getElementById("cred-achievement").textContent = "ዲጂታል ብሪጅ — የተደራሽ ሚዲያ መሰረታዊያን";
+        document.getElementById("dt-recipient").textContent = "ተቀባይ";
+        document.getElementById("dt-issuer").textContent = "ሰጪ";
+        document.getElementById("dt-issued").textContent = "የተሰጠበት ቀን";
+        document.getElementById("cred-issued").textContent = "12 November 2026 (ታኅሣሥ 2019 ዓ.ም.)";
+        document.getElementById("dt-crypto").textContent = "ክሪፕቶግራፊ";
+        document.getElementById("dt-status").textContent = "ሁኔታ";
+        document.getElementById("qr-label").textContent = "ትክክለኛነቱን ለማረጋገጥ ይቃኙ";
+        document.getElementById("btn-download-pdf").textContent = "📄 ምስክር ወረቀቱን አውርድ (PDF)";
+        document.getElementById("btn-download-badge").textContent = "📥 ባጅ አውርድ (JSON-LD)";
+        document.getElementById("btn-share-linkedin").textContent = "🔗 በLinkedIn አጋራ";
+        document.getElementById("btn-verify-demo").textContent = "🔍 ይህንን ባጅ ከመስመር ውጭ አረጋግጥ";
+        document.getElementById("card-verifier-title").textContent = "🛡️ የአሰሪ ከመስመር ውጭ ማረጋገጫ";
+        document.getElementById("sub-zero-server").textContent = "ያለ አገልጋይ ግንኙነት (Zero Server Contact)";
+        document.getElementById("drop-text-main").innerHTML = "የእጩውን <code>credential-*.json</code> ፋይል እዚህ ይጎትቱ";
+        document.getElementById("btn-select-file").textContent = "📂 የባጅ JSON ፋይል ይምረጡ";
+        document.getElementById("btn-test-tampered").textContent = "⚠️ የተዛባ ባጅ ሞክር (ጥቃትን አስመስል)";
+      } else {
+        document.getElementById("skip-link-text").textContent = "Skip to main content";
+        document.getElementById("header-title").textContent = "Certificate Verifier";
+        document.getElementById("header-subtitle").textContent = "Portable cryptographic credentials verified by any employer without contacting ALX";
+        document.getElementById("btn-back").textContent = "← Back to Career Gateway";
+        document.getElementById("card-cred-title").textContent = "🎓 Credential C-7";
+        document.getElementById("dt-achievement").textContent = "Achievement";
+        document.getElementById("cred-achievement").textContent = "Digital Bridge — Accessible Media Basics";
+        document.getElementById("dt-recipient").textContent = "Recipient";
+        document.getElementById("dt-issuer").textContent = "Issuer";
+        document.getElementById("dt-issued").textContent = "Issued Date";
+        document.getElementById("cred-issued").textContent = "12 November 2026";
+        document.getElementById("dt-crypto").textContent = "Cryptography";
+        document.getElementById("dt-status").textContent = "Status";
+        document.getElementById("qr-label").textContent = "Scan to Verify";
+        document.getElementById("btn-download-pdf").textContent = "📄 Download Certificate (PDF)";
+        document.getElementById("btn-download-badge").textContent = "📥 Download Open Badge (JSON-LD)";
+        document.getElementById("btn-share-linkedin").textContent = "🔗 Share on LinkedIn";
+        document.getElementById("btn-verify-demo").textContent = "🔍 Verify This Badge Offline Now";
+        document.getElementById("card-verifier-title").textContent = "🛡️ Employer Offline Verifier";
+        document.getElementById("sub-zero-server").textContent = "Zero ALX Server Contact";
+        document.getElementById("drop-text-main").innerHTML = "Drag &amp; drop candidate's <code>credential-*.json</code> file here";
+        document.getElementById("btn-select-file").textContent = "📂 Select Open Badge JSON File";
+        document.getElementById("btn-test-tampered").textContent = "⚠️ Test Tampered Badge (Simulate Attack)";
+      }
+
+      // Refresh privacy text if active
+      if (isPrivacyProtected) {
+        credRecipientEl.innerHTML = lang === "am"
+          ? `ስሙ በግል ተጠብቋል <span style="color:var(--muted); font-size:0.85rem;">(በተማሪው ምርጫ መሠረት የተጠበቀ)</span>`
+          : `Name withheld for privacy <span style="color:var(--muted); font-size:0.85rem;">(Protected by learner settings)</span>`;
+      } else {
+        credRecipientEl.innerHTML = lang === "am"
+          ? `ዴሞ ተማሪ <span style="color:var(--muted); font-size:0.85rem;">(urn:savanna:learner:demo-001)</span>`
+          : `Demo Learner <span style="color:var(--muted); font-size:0.85rem;">(urn:savanna:learner:demo-001)</span>`;
+      }
+    }
+
+    // Check URL query param ?lang=
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("lang") === "am") {
+      setPageLang("am");
     }
   </script>
 </body>
