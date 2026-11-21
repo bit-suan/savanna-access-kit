@@ -1,4 +1,5 @@
-import QRCode from "../api/node_modules/qrcode/lib/index.js";
+import QRCodeModule from "./qrcode-standalone.mjs";
+const QRCode = QRCodeModule.default || QRCodeModule;
 
 /**
  * Escapes characters for PDF literal strings (parentheses and backslashes)
