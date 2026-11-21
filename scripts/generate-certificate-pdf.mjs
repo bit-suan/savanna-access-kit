@@ -2,11 +2,28 @@ import QRCodeModule from "./qrcode-standalone.mjs";
 const QRCode = QRCodeModule.default || QRCodeModule;
 
 /**
- * Escapes characters for PDF literal strings (parentheses and backslashes)
+ * Sanitizes strings for standard Type 1 Helvetica fonts.
+ * Standard PDF Type 1 fonts only support single-byte WinAnsi/ASCII characters.
+ * Replaces unicode dashes, quotes, and strips Ethiopic script to prevent parser corruption.
  */
-function escapePdfText(text) {
+function sanitizePdfString(text) {
   if (!text) return "";
   return String(text)
+    .replace(/[\u2014\u2013]/g, " - ")
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/\u00B7/g, "-")
+    .replace(/[\u1200-\u137F]/g, "") // remove Ethiopic characters so Type 1 Helvetica does not corrupt
+    .trim();
+}
+
+/**
+ * Escapes characters for PDF literal strings (parentheses and backslashes)
+ * Guarantees strictly printable 7-bit ASCII [0x20..0x7E]
+ */
+function escapePdfText(text) {
+  const clean = sanitizePdfString(text).replace(/[^\x20-\x7E]/g, "");
+  return clean
     .replace(/\\/g, "\\\\")
     .replace(/\(/g, "\\(")
     .replace(/\)/g, "\\)");
@@ -31,7 +48,7 @@ export function generateCertificatePdf(options = {}) {
   const {
     id = "C-7",
     recipientName = "Demo Learner",
-    achievement = "Digital Bridge — Accessible Media Basics",
+    achievement = "Digital Bridge - Accessible Media Basics",
     issuerName = "Savanna Access Kit",
     issuerDid = "did:web:savanna-access-kit.vercel.app",
     issuedAt = "2026-11-12T08:00:00.000Z",
@@ -41,6 +58,17 @@ export function generateCertificatePdf(options = {}) {
   } = options;
 
   const isAmharic = lang === "am";
+
+  // Sanitize and provide fallbacks so text is never empty or corrupt
+  const cleanId = escapePdfText(id) || "C-7";
+  const rawRecipient = escapePdfText(recipientName);
+  const cleanRecipient = rawRecipient || (isAmharic ? "Demo Learner (Demow Temari)" : "Demo Learner");
+  const rawAchievement = escapePdfText(achievement);
+  const cleanAchievement = rawAchievement || "Digital Bridge - Accessible Media Basics";
+  const cleanIssuer = escapePdfText(issuerName) || "Savanna Access Kit";
+  const cleanIssuerDid = escapePdfText(issuerDid) || "did:web:savanna-access-kit.vercel.app";
+  const cleanStatus = escapePdfText(status) || "VALID";
+  const cleanVerifyUrl = escapePdfText(verifyUrl) || "https://savanna-access-kit.vercel.app/verify/C-7";
 
   // Generate real QR code matrix
   const qr = QRCode.create(verifyUrl, { errorCorrectionLevel: "M" });
@@ -57,70 +85,78 @@ export function generateCertificatePdf(options = {}) {
     stream += cmd + "\n";
   };
 
-  // 1. Background Fill
-  add("0.985 0.988 0.995 rg");
+  // 1. Background Fill (Subtle off-white/cream paper)
+  add("q");
+  add("0.99 0.992 0.996 rg");
   add(`0 0 ${W} ${H} re f`);
+  add("Q");
 
   // 2. Outer Border (Savanna Deep Navy #002b56)
+  add("q");
   add("0 0.169 0.337 RG");
   add("4.5 w");
-  add(`16 16 ${W - 32} ${H - 32} re S`);
+  add(`18 18 ${W - 36} ${H - 36} re S`);
+  add("Q");
 
   // 3. Inner Accent Border (Savanna Gold #f5a300)
+  add("q");
   add("0.961 0.639 0 RG");
   add("1.5 w");
-  add(`23 23 ${W - 46} ${H - 46} re S`);
+  add(`25 25 ${W - 50} ${H - 50} re S`);
+  add("Q");
 
   // 4. Corner Ornaments (Gold Triangles)
+  add("q");
   add("0.961 0.639 0 rg");
-  add("25 25 m 45 25 l 25 45 l f");
-  add(`${W - 25} 25 m ${W - 45} 25 l ${W - 25} 45 l f`);
-  add(`25 ${H - 25} m 45 ${H - 25} l 25 ${H - 45} l f`);
-  add(`${W - 25} ${H - 25} m ${W - 45} ${H - 25} l ${W - 25} ${H - 45} l f`);
+  add("27 27 m 48 27 l 27 48 l f");
+  add(`${W - 27} 27 m ${W - 48} 27 l ${W - 27} 48 l f`);
+  add(`27 ${H - 27} m 48 ${H - 27} l 27 ${H - 48} l f`);
+  add(`${W - 27} ${H - 27} m ${W - 48} ${H - 27} l ${W - 27} ${H - 48} l f`);
+  add("Q");
 
-  // 5. Header Banner (Deep Navy)
+  // 5. Header Banner (Deep Navy #002b56)
+  add("q");
   add("0 0.169 0.337 rg");
-  add(`25 ${H - 85} ${W - 50} 60 re f`);
+  add(`27 ${H - 92} ${W - 54} 65 re f`);
+  add("Q");
 
   // 6. Header Typography
   add("BT");
-  add("/F1 16 Tf");
+  add("/F1 18 Tf");
   add("1 1 1 rg");
-  add(`${W / 2 - 120} ${H - 58} Td`);
+  add(`${W / 2 - 110} ${H - 58} Td`);
   add("(SAVANNA ACCESS KIT) Tj");
   add("ET");
 
   add("BT");
   add("/F2 9.5 Tf");
   add("0.961 0.639 0 rg");
-  add(`${W / 2 - 165} ${H - 74} Td`);
-  add("(OPEN BADGES 3.0 · W3C VERIFIABLE CREDENTIAL) Tj");
+  add(`${W / 2 - 145} ${H - 76} Td`);
+  add("(OPEN BADGES 3.0 - W3C VERIFIABLE CREDENTIAL) Tj");
   add("ET");
 
   // 7. Certificate Title
   add("BT");
   add("/F1 25 Tf");
   add("0 0.169 0.337 rg");
-  const certTitle = isAmharic
-    ? "CERTIFICATE OF ACHIEVEMENT (የስኬት ምስክር ወረቀት)"
-    : "CERTIFICATE OF ACHIEVEMENT";
-  add(`${W / 2 - (isAmharic ? 230 : 185)} ${H - 132} Td`);
+  const certTitle = "CERTIFICATE OF ACHIEVEMENT";
+  add(`${W / 2 - 200} ${H - 134} Td`);
   add(`(${escapePdfText(certTitle)}) Tj`);
   add("ET");
 
   // Gold separator line
+  add("q");
   add("0.961 0.639 0 RG");
   add("2 w");
-  add(`${W / 2 - 180} ${H - 144} m ${W / 2 + 180} ${H - 144} l S`);
+  add(`${W / 2 - 180} ${H - 146} m ${W / 2 + 180} ${H - 146} l S`);
+  add("Q");
 
   // 8. Presentation Text
   add("BT");
   add("/F2 12 Tf");
   add("0.35 0.4 0.45 rg");
-  const presentText = isAmharic
-    ? "This certificate confirms completion of curriculum standards for (በክብር የተሰጠው ለ፦):"
-    : "This is proudly presented in recognition of mastery to:";
-  add(`${W / 2 - (isAmharic ? 210 : 160)} ${H - 172} Td`);
+  const presentText = "This credential is proudly awarded in recognition of mastery to:";
+  add(`${W / 2 - 175} ${H - 174} Td`);
   add(`(${escapePdfText(presentText)}) Tj`);
   add("ET");
 
@@ -128,43 +164,58 @@ export function generateCertificatePdf(options = {}) {
   add("BT");
   add("/F1 26 Tf");
   add("0.05 0.1 0.2 rg");
-  add(`${W / 2 - 120} ${H - 212} Td`);
-  add(`(${escapePdfText(recipientName)}) Tj`);
+  const nameWidth = cleanRecipient.length * 15;
+  const nameX = Math.max(50, (W - nameWidth) / 2);
+  add(`${nameX.toFixed(2)} ${H - 212} Td`);
+  add(`(${cleanRecipient}) Tj`);
   add("ET");
 
   // Underline for name
+  add("q");
   add("0.961 0.639 0 RG");
   add("1.5 w");
   add(`${W / 2 - 160} ${H - 222} m ${W / 2 + 160} ${H - 222} l S`);
+  add("Q");
 
-  // 10. Achievement Title
+  // 10. Achievement Title & Subtitle
   add("BT");
   add("/F2 11.5 Tf");
   add("0.35 0.4 0.45 rg");
-  const achSub = isAmharic
-    ? "for successfully completing the course (ስኬት)፦"
-    : "for successfully completing the coursework and evaluation for:";
-  add(`${W / 2 - (isAmharic ? 150 : 170)} ${H - 248} Td`);
+  const achSub = "for successfully demonstrating competency in the curriculum of:";
+  add(`${W / 2 - 175} ${H - 248} Td`);
   add(`(${escapePdfText(achSub)}) Tj`);
   add("ET");
 
   add("BT");
   add("/F1 17 Tf");
   add("0 0.169 0.337 rg");
-  add(`${W / 2 - 190} ${H - 276} Td`);
-  add(`(${escapePdfText(achievement)}) Tj`);
+  const achWidth = cleanAchievement.length * 9.5;
+  const achX = Math.max(50, (W - achWidth) / 2);
+  add(`${achX.toFixed(2)} ${H - 274} Td`);
+  add(`(${cleanAchievement}) Tj`);
+  add("ET");
+
+  add("BT");
+  add("/F2 9.5 Tf");
+  add("0.4 0.45 0.5 rg");
+  const compText = "Audio Description Authoring - Bilingual Accessibility - 2G Offline Delivery";
+  add(`${W / 2 - 200} ${H - 292} Td`);
+  add(`(${escapePdfText(compText)}) Tj`);
   add("ET");
 
   // 11. Metadata Summary Card (Left side)
-  add("0.96 0.97 0.99 rg");
-  add("0.8 0.85 0.9 RG");
+  add("q");
+  add("0.965 0.975 0.99 rg");
+  add("0.78 0.83 0.89 RG");
   add("1 w");
-  add("50 82 520 135 re B");
+  add("45 68 545 154 re B");
+  add("Q");
 
   add("BT");
   add("/F1 11 Tf");
   add("0 0.169 0.337 rg");
-  add("70 192 Td (Cryptographic Verification Details:) Tj");
+  add("65 198 Td");
+  add("(Cryptographic Verification & DID Identity:) Tj");
   add("ET");
 
   const formattedDate = new Date(issuedAt).toLocaleDateString("en-GB", {
@@ -174,30 +225,47 @@ export function generateCertificatePdf(options = {}) {
     timeZone: "UTC",
   });
 
-  add("BT");
-  add("/F2 9.5 Tf");
-  add("0.2 0.25 0.3 rg");
-  add(`70 172 Td (Recipient ID: urn:savanna:learner:demo-001) Tj`);
-  add(`70 154 Td (Issuer Identity: ${escapePdfText(issuerName)} [${escapePdfText(issuerDid)}]) Tj`);
-  add(`70 136 Td (Issue Date: ${escapePdfText(formattedDate)} · Status: ${status.toUpperCase()}) Tj`);
-  add(`70 118 Td (Credential ID: ${escapePdfText(id)} · Type: VerifiableCredential, OpenBadgeCredential) Tj`);
-  add(`70 100 Td (Proof Standard: Ed25519 DataIntegrityProof · eddsa-rdfc-2022) Tj`);
-  add("ET");
+  const metaLines = [
+    `Recipient Identifier: urn:savanna:learner:demo-001`,
+    `Issuer Identity: ${cleanIssuer} [${cleanIssuerDid}]`,
+    `Issue Date: ${escapePdfText(formattedDate)}  -  Status: ${cleanStatus.toUpperCase()}`,
+    `Credential ID: ${cleanId}  -  Standard: Open Badges 3.0 (W3C VC)`,
+    `Proof Standard: Ed25519 DataIntegrityProof (eddsa-rdfc-2022)`,
+    `Verification: 100% offline verifiable using issuer's public DID key`,
+  ];
+
+  for (let i = 0; i < metaLines.length; i++) {
+    const y = 178 - i * 17;
+    add("BT");
+    add("/F2 9.2 Tf");
+    add("0.2 0.25 0.3 rg");
+    add(`65 ${y} Td`);
+    add(`(${metaLines[i]}) Tj`);
+    add("ET");
+  }
 
   // 12. Vector QR Code (Right side)
   const qrTargetSize = 100;
   const qrModSize = qrTargetSize / qrSize;
-  const qrX = W - 200;
-  const qrY = 105;
+  const qrBoxX = 620;
+  const qrBoxY = 68;
+  const qrBoxW = 176;
+  const qrBoxH = 154;
 
   // QR container background
+  add("q");
   add("1 1 1 rg");
-  add(`${qrX - 6} ${qrY - 6} ${qrTargetSize + 12} ${qrTargetSize + 12} re f`);
-  add("0.85 0.88 0.92 RG");
+  add(`${qrBoxX} ${qrBoxY} ${qrBoxW} ${qrBoxH} re f`);
+  add("0.78 0.83 0.89 RG");
   add("1 w");
-  add(`${qrX - 6} ${qrY - 6} ${qrTargetSize + 12} ${qrTargetSize + 12} re S`);
+  add(`${qrBoxX} ${qrBoxY} ${qrBoxW} ${qrBoxH} re S`);
+  add("Q");
 
-  // QR black squares
+  // QR black squares (centered in QR box)
+  const qrX = qrBoxX + (qrBoxW - qrTargetSize) / 2;
+  const qrY = qrBoxY + 34;
+
+  add("q");
   add("0 0 0 rg");
   for (let r = 0; r < qrSize; r++) {
     for (let c = 0; c < qrSize; c++) {
@@ -209,25 +277,36 @@ export function generateCertificatePdf(options = {}) {
     }
   }
   add("f");
+  add("Q");
 
-  // QR Verification Label
+  // QR Verification Labels
   add("BT");
-  add("/F1 8.5 Tf");
+  add("/F1 9 Tf");
   add("0 0.169 0.337 rg");
-  add(`${qrX - 10} ${qrY - 18} Td (Scan to Verify Online) Tj`);
+  add(`${qrBoxX + 38} ${qrBoxY + qrBoxH - 16} Td`);
+  add("(Scan to Verify Online) Tj");
   add("ET");
 
   add("BT");
   add("/F2 7.5 Tf");
-  add("0.4 0.45 0.5 rg");
-  add(`${qrX - 15} ${qrY - 28} Td (savanna-access-kit.vercel.app) Tj`);
+  add("0.35 0.4 0.45 rg");
+  add(`${qrBoxX + 28} ${qrBoxY + 18} Td`);
+  add("(savanna-access-kit.vercel.app) Tj");
   add("ET");
 
   // 13. Footer Disclaimer
   add("BT");
-  add("/F2 8 Tf");
+  add("/F1 8 Tf");
+  add("0 0.169 0.337 rg");
+  add("45 44 Td");
+  add("(OFFICIALLY ISSUED BY SAVANNA ACCESS KIT  -  OPEN BADGES 3.0 VERIFIABLE CREDENTIAL) Tj");
+  add("ET");
+
+  add("BT");
+  add("/F2 7.5 Tf");
   add("0.45 0.5 0.55 rg");
-  add(`50 48 Td (This certificate is mathematically verifiable offline with zero server contact using the issuer's public DID key.) Tj`);
+  add("45 32 Td");
+  add("(This certificate is mathematically verifiable offline with zero server contact using the issuer's public DID key.) Tj");
   add("ET");
 
   // 14. Compile PDF Document with exact Cross-Reference Table
