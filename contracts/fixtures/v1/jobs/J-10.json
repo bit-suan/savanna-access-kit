@@ -8,6 +8,24 @@
   "validThrough": "2027-01-15T23:59:59.000Z",
   "employmentType": "FULL_TIME",
   "applyUrl": "/apply/J-10",
+  "i18n": {
+    "title": {
+      "en": "Junior Data Steward",
+      "am": "ጀማሪ የመረጃ ጠባቂ"
+    },
+    "employer": {
+      "en": "Savanna Partners",
+      "am": "ሳቫና አጋሮች"
+    },
+    "location": {
+      "en": "Remote",
+      "am": "ከርቀት"
+    },
+    "payText": {
+      "en": "ETB 15,000–20,000 / month",
+      "am": "በወር ከ15,000–20,000 ብር"
+    }
+  },
   "description": {
     "en": "Keep learner records accurate and private. Remote-friendly, screen-reader-tested application.",
     "am": "የተማሪ መዝገቦች ትክክለኛ እና የግል እንዲሆኑ ያድርጉ። ማመልከቻው ከርቀት ተስማሚ እና በማያ ንባብ የተሞከረ ነው።",
