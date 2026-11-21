@@ -306,7 +306,7 @@
 
       <!-- Action Button Group -->
       <div class="btn-group">
-        <a href="/verify/C-7/pdf" class="btn primary" id="btn-download-pdf">
+        <a href="/verify/C-7/pdf?v=2" class="btn primary" id="btn-download-pdf">
           📄 Download Certificate (PDF)
         </a>
         <a href="/verify/C-7.json" download="credential-C-7.json" class="btn secondary" id="btn-download-badge">
@@ -572,9 +572,9 @@
       document.getElementById("lang-btn-en").setAttribute("aria-pressed", String(lang === "en"));
       document.getElementById("lang-btn-am").setAttribute("aria-pressed", String(lang === "am"));
 
-      // Update PDF Download link with query param
+      // Update PDF Download link with query param and cache-buster
       const pdfBtn = document.getElementById("btn-download-pdf");
-      pdfBtn.href = `/verify/C-7/pdf?lang=${lang}`;
+      pdfBtn.href = `/verify/C-7/pdf?lang=${lang}&v=${Date.now()}`;
 
       const announcer = document.getElementById("verify-lang-announcer");
       if (announcer) {
