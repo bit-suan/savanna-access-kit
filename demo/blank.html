@@ -187,22 +187,6 @@
         </p>
 
         <div style="margin-top: 1rem;">
-          <!-- Extra Features: Access Label & Set up for me (Addendum 1.2) -->
-          <div style="margin-bottom: 1.25rem;">
-            <savanna-access-label
-              lesson="L-102"
-              api=""
-              api-key="pk_dev_local"
-              lang="am"
-            ></savanna-access-label>
-          </div>
-
-          <div style="margin-bottom: 1.25rem;">
-            <savanna-access-profiles
-              lang="am"
-            ></savanna-access-profiles>
-          </div>
-
           <savanna-player
             id="standalone-player"
             lesson="L-102"
@@ -320,7 +304,7 @@
           langBtns.forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
 
           // Update attributes on all Savanna components
-          document.querySelectorAll("savanna-player, savanna-job-card, savanna-credential, savanna-access-label, savanna-access-profiles").forEach((el) => {
+          document.querySelectorAll("savanna-player, savanna-job-card, savanna-credential").forEach((el) => {
             el.setAttribute("lang", lang);
           });
 
